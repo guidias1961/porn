@@ -33,7 +33,7 @@
   .row{display:flex;gap:16px;align-items:flex-start}
   .panel{background:var(--panel);border:1px solid #222;padding:12px;color:#ddd}
   .hero{flex:1}
-  .side{width:320px}
+  .side{width:340px}
   h1,h2{font-family:'Bebas Neue',sans-serif;margin:0 0 6px;letter-spacing:.3px}
   h1{font-size:34px} h2{font-size:22px}
   .muted{color:var(--muted)}
@@ -49,6 +49,7 @@
   .live{position:absolute;top:8px;left:8px;background:var(--accent2);color:#fff;font-weight:900;padding:2px 6px;font-size:11px}
   .error{color:#ffb3b3}
   footer{padding:20px;color:#999;text-align:center}
+  .kbd{background:#111;padding:2px 4px;border:1px solid #333;color:#ccc}
 </style>
 </head>
 <body>
@@ -71,10 +72,14 @@
     </div>
   </div>
   <div class="subbar">
-    <div class="wrap">
+    <div class="wrap" style="gap:14px;flex-wrap:wrap">
       <span>API status:</span>
       <span id="apiStatus" class="muted">probing…</span>
-      <span style="margin-left:auto">Share with <b>#PulseChain</b> <b>#WPLS</b></span>
+      <span style="margin-left:auto"></span>
+      <span class="muted">API base</span>
+      <input id="apiBase" value="https://scan.pulsechain.com/api/v2" style="width:360px;background:#0f0f0f;border:1px solid #2a2a2a;color:#e9e9ea;padding:6px 8px;border-radius:0">
+      <button class="btn" id="setBase">Set base</button>
+      <span class="muted">expected path <span class="kbd">/addresses/{hash}</span></span>
     </div>
   </div>
 </header>
@@ -83,12 +88,12 @@
   <div class="row">
     <section class="panel hero">
       <h1>Live wallets exposed</h1>
-      <div class="banner" id="hint">Paste a wallet and click Analyze. Each analysis becomes a public “exposed card” with a one-click Twitter share.</div>
+      <div class="banner" id="hint">Paste a wallet and click Analyze. Each analysis becomes a public “exposed card” with one-click Twitter share. If your explorer isn’t PulseScan, paste its API base above and click Set base.</div>
       <div id="grid" class="grid"></div>
     </section>
     <aside class="panel side">
       <h2>How it works</h2>
-      <p class="muted">We call the explorer REST endpoint for an address. From the JSON we read <b>coin_balance</b> and <b>exchange_rate</b> to estimate USD, then print a meme line.</p>
+      <p class="muted">We call <code>GET {API_BASE}/addresses/{address_hash}</code>. From JSON we read <b>coin_balance</b> and <b>exchange_rate</b> to estimate USD, then print:</p>
       <p class="banner">“0x8a3... is showing it all — $431 in liquidity left unlocked.”</p>
       <hr style="border:0;border-top:1px solid #222;margin:12px 0">
       <button class="btn twitter" id="tweetSite">Tweet the site</button>
@@ -99,34 +104,32 @@
 <footer>© PORN • Orion Peep Show • For entertainment only</footer>
 
 <script>
-/* ===== CONFIG ===== */
-const API_BASE = "https://scan.mypinata.cloud/ipfs/bafybeih3olry3is4e4zm7russ5lh3erzphcal5a7ayflkhzm5ojviro2cp4/4"; // base do seu print
-const CANDIDATES = [
-  (addr)=>`${API_BASE}/api/v2/addresses/${addr}`,
-  (addr)=>`${API_BASE}/addresses/${addr}`,
-  (addr)=>`${API_BASE}/address/${addr}`,
-  // fallback para gateways que exigem barra final
-  (addr)=>`${API_BASE}/api/v2/addresses/${addr}/`,
-  (addr)=>`${API_BASE}/addresses/${addr}/`
+const DEFAULT_BASES = [
+  "https://scan.pulsechain.com/api/v2",       // Blockscout padrão
+  "https://explorer.pulsechain.com/api/v2"    // alternativo se existir espelho
 ];
 const PULSEX_BUY_URL = "https://app.pulsex.com/";
 const DEFAULT_USD_RATE = 0.00002;
 const MAX_CARDS = 24;
 
-/* ===== UI ===== */
 const addrInput = document.getElementById('addrInput');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const grid = document.getElementById('grid');
 const apiStatus = document.getElementById('apiStatus');
 const tweetSite = document.getElementById('tweetSite');
 const buyBtn = document.getElementById('buyBtn');
+const apiBaseInput = document.getElementById('apiBase');
+const setBaseBtn = document.getElementById('setBase');
+
+let API_BASE = apiBaseInput.value;
+let baseResolved = false;
 
 const shortAddr = (a)=> a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){
   if(x==null) return 0;
   const n = Number(x);
   if(!isFinite(n)) return 0;
-  return n>1e12 ? n/1e18 : n; // heurística wei→unit
+  return n>1e12 ? n/1e18 : n;
 }
 function pickRate(obj, topLevel){
   return Number(obj?.exchange_rate) || Number(obj?.token?.exchange_rate) || Number(topLevel?.exchange_rate) || DEFAULT_USD_RATE;
@@ -135,29 +138,42 @@ function composeLine(address, usd){
   return `${shortAddr(address)} is showing it all — $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} in liquidity left unlocked.`;
 }
 
-/* ===== endpoint discovery ===== */
-let resolved = null;
-async function probeEndpoint(addr){
-  // já resolvido
-  if(resolved) return resolved;
-  for(const make of CANDIDATES){
-    const url = make(addr);
-    try{
-      const r = await fetch(url, {headers:{accept:'application/json'}});
-      if(!r.ok) continue;
-      const j = await r.json();
-      if(j && Array.isArray(j.items) && j.items.length){
-        resolved = make; // guarda o gerador de URL
-        apiStatus.textContent = `OK ${url}`;
-        return resolved;
-      }
-    }catch(_){}
-  }
-  apiStatus.innerHTML = `<span class="error">no route responded 200</span>`;
-  return null;
+async function ping(base, addr){
+  const url = `${base.replace(/\/$/,'')}/addresses/${addr}`;
+  try{
+    const r = await fetch(url, {headers:{accept:'application/json'}});
+    if(!r.ok) return {ok:false, status:r.status};
+    const j = await r.json();
+    const ok = j && (Array.isArray(j.items) ? j.items.length>0 : true);
+    return {ok, url, j};
+  }catch(e){ return {ok:false, status:'net'}; }
 }
 
-/* ===== render ===== */
+async function ensureBase(addr){
+  if(baseResolved) return true;
+  apiStatus.textContent = 'probing…';
+  // tenta a base informada
+  let res = await ping(API_BASE, addr);
+  if(res.ok){
+    apiStatus.textContent = `OK ${res.url}`;
+    baseResolved = true;
+    return true;
+  }
+  // tenta defaults
+  for(const b of DEFAULT_BASES){
+    res = await ping(b, addr);
+    if(res.ok){
+      API_BASE = b;
+      apiBaseInput.value = b;
+      apiStatus.textContent = `OK ${res.url}`;
+      baseResolved = true;
+      return true;
+    }
+  }
+  apiStatus.innerHTML = `<span class="error">no route responded 200 at ${API_BASE}/addresses/{hash}</span>`;
+  return false;
+}
+
 function addCard({address, usd, balance, icon, tokenSymbol, holders, reputation}){
   const card = document.createElement('div');
   card.className = 'card';
@@ -180,23 +196,20 @@ function addCard({address, usd, balance, icon, tokenSymbol, holders, reputation}
   while(grid.children.length>MAX_CARDS) grid.removeChild(grid.lastChild);
 }
 
-/* ===== analyze ===== */
 async function analyze(addr){
-  const maker = await probeEndpoint(addr);
-  if(!maker){ return; }
-  const url = maker(addr);
+  const ok = await ensureBase(addr);
+  if(!ok) return;
+  const url = `${API_BASE.replace(/\/$/,'')}/addresses/${addr}`;
   try{
     const r = await fetch(url, {headers:{accept:'application/json'}});
     if(!r.ok){ apiStatus.innerHTML = `<span class="error">API ${r.status}</span>`; return; }
     const data = await r.json();
-
-    // estrutura: { exchange_rate, total_supply, items:[ { coin_balance, exchange_rate, token:{...}, ... } ] }
-    const item = (data.items && data.items[0]) ? data.items[0] : {};
+    // aceita dois formatos: com items[] (como o seu exemplo) ou objeto direto
+    const item = Array.isArray(data.items) ? (data.items[0]||{}) : data;
     const bal = toFloat(item.coin_balance);
     const rate = pickRate(item, data);
     const usd = bal * rate;
     const token = item.token || {};
-
     addCard({
       address: addr,
       usd,
@@ -206,12 +219,18 @@ async function analyze(addr){
       holders: token.holders_count,
       reputation: item.reputation || token.reputation
     });
+    apiStatus.textContent = `OK ${url}`;
   }catch(e){
     apiStatus.innerHTML = `<span class="error">${e.message||e}</span>`;
   }
 }
 
-/* ===== events ===== */
+document.getElementById('setBase').onclick = ()=>{
+  API_BASE = apiBaseInput.value.trim().replace(/\/$/,'');
+  baseResolved = false;
+  apiStatus.textContent = `base set to ${API_BASE}`;
+};
+
 analyzeBtn.onclick = ()=>{
   const a = addrInput.value.trim();
   if(!/^0x[a-fA-F0-9]{40}$/.test(a)){ alert('Paste a valid 0x address'); return; }
@@ -224,10 +243,8 @@ tweetSite.onclick = ()=>{
 };
 buyBtn.onclick = ()=> window.open(PULSEX_BUY_URL, "_blank");
 
-/* ===== boot ===== */
-(async function boot(){
-  // só para mostrar base
-  apiStatus.textContent = `probing ${API_BASE}`;
+// deep-link ?addr=0x...
+(function boot(){
   const qp = new URLSearchParams(location.search);
   const addr = qp.get('addr');
   if(addr && /^0x[a-fA-F0-9]{40}$/.test(addr)) analyze(addr);
