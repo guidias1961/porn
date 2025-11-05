@@ -1,4 +1,4 @@
-// Orion Peep Show — proxy anti CORS, detecção de token, preço WPLS, persistência
+// Orion Peep Show — proxy anti CORS, detecção de token, preço WPLS, Dexscreener p/ métricas, persistência
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
@@ -11,11 +11,11 @@ const ROOT = __dirname;
 const PUB = path.join(ROOT, "public");
 const DB_PATH = path.join(ROOT, "db.json");
 
-// Blockscout correto
+// Blockscout
 const V2_BASE = (process.env.EXPLORER_V2 || "https://api.scan.pulsechain.com/api/v2").replace(/\/$/, "");
 const ES_BASE = (process.env.EXPLORER_ES || "https://api.scan.pulsechain.com/api").replace(/\/$/, "");
 
-// CSP conectando só em self
+// CSP
 app.use((req, res, next) => {
   res.set(
     "Content-Security-Policy",
@@ -28,7 +28,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// DB simples
+// DB
 if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {} }, null, 2));
 const loadDB = () => { try { return JSON.parse(fs.readFileSync(DB_PATH, "utf8")); } catch { return { items: {} }; } };
 const saveDB = (state) => fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2));
@@ -40,9 +40,9 @@ app.use(express.static(PUB, { index: "index.html", extensions: ["html"] }));
 
 app.get("/healthz", (_req, res) => res.type("text").send("ok"));
 
-// util
+// utils
 async function getJSON(url){
-  const r = await fetch(url, { headers: { accept: "application/json" }, timeout: 10000 });
+  const r = await fetch(url, { headers: { accept: "application/json" }, timeout: 12000 });
   const text = await r.text();
   let body = null;
   try { body = JSON.parse(text); } catch { body = null; }
@@ -66,18 +66,19 @@ function normalizeTokenFromV2(j, hash){
       is_contract: true,
       is_token: true,
       coin_balance: null,
-      transactions_count: null,
+      transactions_count: Number(t.transactions_count ?? 0),
       token: {
         symbol: t.symbol || null,
         name: t.name || null,
         address_hash: hash,
         decimals: Number(t.decimals ?? t.decimal ?? 18),
-        holders_count: Number(t.holders_count ?? 0),
+        holders_count: Number(t.holders_count ?? 0) || null,
         total_supply: String(t.total_supply ?? t.totalSupply ?? "0"),
         type: t.type || "ERC-20",
         icon_url: t.icon_url || t.icon || null,
         exchange_rate: t.exchange_rate || null,
-        reputation: "ok"
+        reputation: "ok",
+        market: null // preenchido via Dexscreener
       },
       is_verified: !!(t.verified || t.is_verified),
       reputation: "ok"
@@ -132,12 +133,13 @@ function normalizeTokenFromES(hash, name, symbol){
         name: name || null,
         address_hash: hash,
         decimals: 18,
-        holders_count: 0,
+        holders_count: null,
         total_supply: "0",
         type: "ERC-20",
         icon_url: null,
         exchange_rate: null,
-        reputation: "ok"
+        reputation: "ok",
+        market: null
       },
       is_verified: null,
       reputation: "ok"
@@ -145,26 +147,59 @@ function normalizeTokenFromES(hash, name, symbol){
   };
 }
 
+// Dexscreener helper
+function pickBestPair(pairs){
+  if(!Array.isArray(pairs) || !pairs.length) return null;
+  const pulsePairs = pairs.filter(p => (p.chainId||"").toLowerCase().includes("pulse"));
+  const list = pulsePairs.length ? pulsePairs : pairs;
+  return list
+    .map(p => ({ p, liq: Number(p?.liquidity?.usd||0) }))
+    .sort((a,b) => b.liq - a.liq)[0]?.p || null;
+}
+async function enrichWithDexscreener(norm, addr){
+  try{
+    const ds = await getJSON(`https://api.dexscreener.com/latest/dex/tokens/${addr}`);
+    const pairs = ds.body?.pairs || [];
+    const best = pickBestPair(pairs);
+    if(!best) return norm;
+
+    const mkt = {
+      price_usd: best.priceUsd ? Number(best.priceUsd) : null,
+      liquidity_usd: best.liquidity?.usd ? Number(best.liquidity.usd) : null,
+      fdv_usd: best.fdv ? Number(best.fdv) : null,
+      market_cap_usd: best.marketCap ? Number(best.marketCap) : (best.fdv ? Number(best.fdv) : null),
+      pair_url: best.url || null,
+      dex: best.dexId || null,
+      base_symbol: best.baseToken?.symbol || null,
+      base_name: best.baseToken?.name || null,
+      quote_symbol: best.quoteToken?.symbol || null
+    };
+
+    const item = norm.items[0];
+    if(item && item.token){
+      item.token.market = mkt;
+      if(!item.token.symbol && mkt.base_symbol) item.token.symbol = mkt.base_symbol;
+      if(!item.token.name && mkt.base_name) item.token.name = mkt.base_name;
+    }
+  }catch{}
+  return norm;
+}
+
 // preço WPLS com cache
 let priceCache = { val: null, ts: 0, src: "fallback" };
 async function fetchWplsPrice(){
-  // 1 env fixa
   if (process.env.WPLS_PRICE_USD) {
     const v = Number(process.env.WPLS_PRICE_USD);
     if (isFinite(v) && v > 0) return { price: v, src: "env" };
   }
-  // 2 dexscreener search
   try{
     const r = await getJSON("https://api.dexscreener.com/latest/dex/search?q=wpls");
     const pairs = r.body?.pairs || [];
-    // pega o primeiro par onde base é WPLS e tem priceUsd
     const p = pairs.find(p => p?.baseToken?.symbol === "WPLS" && p?.priceUsd);
     if (p && Number(p.priceUsd) > 0) return { price: Number(p.priceUsd), src: "dexscreener" };
   }catch{}
-  // 3 fallback
   return { price: 0.00002, src: "fallback" };
 }
-
 app.get("/api/price", async (_req, res) => {
   const now = Date.now();
   if (priceCache.val && now - priceCache.ts < 60_000) {
@@ -175,30 +210,32 @@ app.get("/api/price", async (_req, res) => {
   res.json({ wplsUsd: price, from: src, cached: false });
 });
 
-// endpoint principal com classificação robusta
+// endpoint principal com classificação + enriquecimento
 app.get("/api/explorer/addresses/:hash", async (req, res) => {
   const hash = req.params.hash;
 
-  // 1 tenta detectar token via v2 /tokens
+  // 1 tenta token direto
   try{
     const tok = await getJSON(`${V2_BASE}/tokens/${hash}`);
     if (tok.ok && tok.body) {
-      const norm = normalizeTokenFromV2(tok.body, hash);
+      let norm = normalizeTokenFromV2(tok.body, hash);
+      norm = await enrichWithDexscreener(norm, hash);
       res.set("x-proxy-source", tok.url);
       return res.status(200).json(norm);
     }
   }catch{}
 
-  // 2 tenta v2 /addresses como wallet ou contrato simples
+  // 2 tenta address e, se contrato, tenta tokens novamente
   try{
     const addr = await getJSON(`${V2_BASE}/addresses/${hash}`);
     if (addr.ok && addr.body) {
-      const norm = normalizeWalletFromV2(addr.body, hash);
+      let norm = normalizeWalletFromV2(addr.body, hash);
       if (norm.items[0].is_contract) {
         try{
           const tok2 = await getJSON(`${V2_BASE}/tokens/${hash}/`);
           if (tok2.ok && tok2.body) {
-            const normTok = normalizeTokenFromV2(tok2.body, hash);
+            let normTok = normalizeTokenFromV2(tok2.body, hash);
+            normTok = await enrichWithDexscreener(normTok, hash);
             res.set("x-proxy-source", tok2.url);
             return res.status(200).json(normTok);
           }
@@ -224,7 +261,8 @@ app.get("/api/explorer/addresses/:hash", async (req, res) => {
       const row = Array.isArray(srcR?.body?.result) ? srcR.body.result[0] : null;
       const name = row?.TokenName || null;
       const symbol = row?.TokenSymbol || null;
-      const normTok = normalizeTokenFromES(hash, name, symbol);
+      let normTok = normalizeTokenFromES(hash, name, symbol);
+      normTok = await enrichWithDexscreener(normTok, hash);
       res.set("x-proxy-source", "fallback:abi_erc20");
       return res.status(200).json(normTok);
     }

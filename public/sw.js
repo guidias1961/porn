@@ -1,4 +1,4 @@
-// Intercepta chamadas diretas a /api/v2/{addresses|tokens}/0x... e redireciona ao proxy local
+// Redireciona chamadas diretas a /api/v2/{addresses|tokens}/0x... para o proxy local
 self.addEventListener('fetch', event => {
   try{
     const url = new URL(event.request.url);

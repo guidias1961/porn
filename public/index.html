@@ -70,15 +70,15 @@
   .side{width:360px}
   h1,h2{font-family:'Bebas Neue',sans-serif;margin:0 0 6px;letter-spacing:.3px}
   h1{font-size:34px} h2{font-size:22px}
-  .muted{color:var(--muted)}
+  .muted{color:#a0a0a3}
   .banner{background:#0a0a0a;border:1px dashed #2e2e2e;color:#f7d083;padding:8px 10px}
   .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
   @media (max-width:1100px){.grid{grid-template-columns:repeat(2,1fr)}}
   @media (max-width:820px){.grid{grid-template-columns:1fr} .side{display:none}}
   .card{background:var(--panel2);border:1px solid #2a2a2a;padding:8px;position:relative}
   .thumb{background:#070707;border:1px solid #222;height:120px;display:flex;align-items:center;justify-content:center;color:#666;font-weight:700}
-  .titleLine{margin-top:8px;font-weight:700;color:#fff}
-  .meta{display:flex;justify-content:space-between;color:#a8a8ab;font-size:12px;margin-top:4px}
+  .titleLine{margin-top:8px;font-weight:800;color:#fff}
+  .meta{display:flex;justify-content:space-between;color:#a8a8ab;font-size:12px;margin-top:4px;gap:12px;flex-wrap:wrap}
   .shareRow{display:flex;gap:6px;margin-top:8px}
   .live{position:absolute;top:8px;left:8px;background:var(--accent2);color:#fff;font-weight:900;padding:2px 6px;font-size:11px}
   footer{padding:20px;color:#999;text-align:center}
@@ -149,29 +149,21 @@
 <footer>© PORN • Orion Peep Show • entertainment only</footer>
 
 <script>
-// registra service worker
+// SW
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
 
-let WPLS_USD = 0.00002; // update via backend
-(async function loadPrice(){
-  try{
-    const r = await fetch("/api/price");
-    if(r.ok){
-      const j = await r.json();
-      if (j && j.wplsUsd && Number(j.wplsUsd) > 0) WPLS_USD = Number(j.wplsUsd);
-    }
-  }catch{}
-})();
+let WPLS_USD = 0.00002;
+(async function loadPrice(){ try{ const r = await fetch("/api/price"); if(r.ok){ const j = await r.json(); if(j && j.wplsUsd && Number(j.wplsUsd)>0) WPLS_USD = Number(j.wplsUsd); } }catch{} })();
 
 const MAX_CARDS = 24;
 const PULSEX_BUY_URL = "https://app.pulsex.com/";
 
-const addrInput = document.getElementById('addrInput');
-const analyzeBtn = document.getElementById('analyzeBtn');
-const grid = document.getElementById('grid');
-const apiStatus = document.getElementById('apiStatus');
-const trendWallets = document.getElementById('trendWallets');
-const trendTokens  = document.getElementById('trendTokens');
+const addrInput   = document.getElementById('addrInput');
+const analyzeBtn  = document.getElementById('analyzeBtn');
+const grid        = document.getElementById('grid');
+const apiStatus   = document.getElementById('apiStatus');
+const trendWallets= document.getElementById('trendWallets');
+const trendTokens = document.getElementById('trendTokens');
 
 const shortAddr = a => a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){ if(x==null) return 0; const n=Number(x); if(!isFinite(n)) return 0; return n>1e12 ? n/1e18 : n; }
@@ -215,18 +207,20 @@ async function analyze(addr){
     const name = token.name || null;
     const symbol = token.symbol || (isToken ? 'TOKEN' : 'WPLS');
     const txs = Number(item.transactions_count||0);
-    const holders = Number(token.holders_count||0);
+    const holders = Number(token.holders_count||0) || null;
     const verified = !!item.is_verified;
     const reputation = item.reputation || token.reputation || null;
 
     const balWPLS = toFloat(item.coin_balance);
     const usd = isToken ? 0 : balWPLS * WPLS_USD;
 
+    const market = token.market || null;
     const type = isToken ? "token" : "wallet";
-    const message = eroticMessage({ type, usd, txs, holders, verified, reputation, name, symbol });
+
+    const message = eroticMessage({ type, usd, txs, holders: holders||0, verified, reputation, name, symbol });
     const titleLine = titleFor({ address: addr, usd, type, name, symbol });
 
-    addCard({ address: addr, usd, balance: balWPLS, symbol, name, message, icon: token.icon_url, type, holders });
+    addCard({ address: addr, usd, balance: balWPLS, symbol, name, message, icon: token.icon_url, type, holders, market });
 
     await fetch("/api/record", {
       method:"POST", headers:{'content-type':'application/json'},
@@ -240,15 +234,31 @@ async function analyze(addr){
   }
 }
 
-function addCard({address, usd, balance, symbol, name, message, icon, type, holders}){
+function fmtUsd(x){ if(x==null || !isFinite(x)) return ""; return "$"+Number(x).toLocaleString(undefined,{maximumFractionDigits:2}); }
+
+function addCard({address, usd, balance, symbol, name, message, icon, type, holders, market}){
   const card = document.createElement('div');
   card.className = 'card';
-  const right = type==='token'
-    ? `Holders ${holders.toLocaleString()}`
-    : `Bal ${balance.toLocaleString(undefined,{maximumFractionDigits:4})} WPLS • $${usd.toLocaleString(undefined,{maximumFractionDigits:2})}`;
+
+  // linha da direita dinâmica
+  let right = "";
+  if(type==='token'){
+    const parts = [];
+    if(market?.price_usd) parts.push(`Price ${fmtUsd(market.price_usd)}`);
+    if(market?.market_cap_usd) parts.push(`MC ${fmtUsd(market.market_cap_usd)}`);
+    if(market?.liquidity_usd) parts.push(`Liq ${fmtUsd(market.liquidity_usd)}`);
+    if(holders && holders>0) parts.push(`Holders ${holders.toLocaleString()}`);
+    right = parts.join(" • ");
+  }else{
+    right = `Bal ${balance.toLocaleString(undefined,{maximumFractionDigits:4})} WPLS • ${fmtUsd(usd)}`;
+  }
+
   const headline = type==='token'
     ? `${[symbol, name].filter(Boolean).join(" ") || 'TOKEN'}`
     : `${shortAddr(address)}`;
+
+  const pairLink = market?.pair_url ? `<a class="btn" target="_blank" href="${market.pair_url}">Pair</a>` : "";
+
   card.innerHTML = `
     <div class="live">LIVE</div>
     <div class="thumb">${icon ? `<img src="${icon}" alt="token" style="max-height:90%;max-width:90%">` : (type==='token'?'TOKEN':'WALLET')}</div>
@@ -257,6 +267,7 @@ function addCard({address, usd, balance, symbol, name, message, icon, type, hold
     <div class="banner" style="margin-top:8px">${message}</div>
     <div class="shareRow">
       <button class="btn twitter">Share</button>
+      ${pairLink}
       <a class="btn" target="_blank" href="https://scan.pulsechain.com/address/${address}">Explorer</a>
     </div>`;
   card.querySelector('.btn.twitter').onclick = ()=>{
@@ -274,7 +285,7 @@ async function loadTrending(){
     const j = await r.json();
     renderList(trendWallets, j.wallets);
     renderList(trendTokens,  j.tokens);
-  }catch(e){
+  }catch{
     trendWallets.innerHTML = `<div class="muted">no data</div>`;
     trendTokens.innerHTML  = `<div class="muted">no data</div>`;
   }

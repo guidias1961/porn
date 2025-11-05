@@ -1,6 +1,6 @@
 {
   "name": "porn-orion-peep-show",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "type": "commonjs",
   "main": "server.js",
   "scripts": { "start": "node server.js" },
