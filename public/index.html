@@ -9,11 +9,8 @@
 
 <script>
 (function(){
-  const ADDR_RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/(addresses|tokens)\/(0x[a-fA-F0-9]{40})\/?$/i;
-  function toLocal(u){
-    const m = u && u.match(ADDR_RE);
-    return m ? `/api/explorer/addresses/${m[2]}` : null;
-  }
+  const RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/(addresses|tokens)\/(0x[a-fA-F0-9]{40})\/?$/i;
+  function toLocal(u){ const m = u && u.match(RE); return m ? `/api/explorer/addresses/${m[2]}` : null; }
   const _fetch = window.fetch.bind(window);
   window.fetch = function(input, init){
     try{
@@ -25,10 +22,7 @@
   };
   const _open = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function(method, url){
-    try{
-      const local = toLocal(url);
-      if(local) arguments[1] = local;
-    }catch(_){}
+    try{ const local = toLocal(url); if(local) arguments[1] = local; }catch(_){}
     return _open.apply(this, arguments);
   };
   const _Request = window.Request;
@@ -49,7 +43,7 @@
 <style>
   :root{--bg:#0b0b0c;--panel:#111112;--panel2:#1c1c1e;--text:#e9e9ea;--muted:#a0a0a3;--accent:#ff9900;--accent2:#ff0066;--blue:#1d9bf0}
   *{box-sizing:border-box} html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.45}
+  body{margin:0;background:var(--bg);color:#e9e9ea;font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.45}
   a{color:#5aa9ff;text-decoration:none}
   header{background:#000;border-bottom:2px solid #1a1a1a;color:#fff}
   .topbar{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:10px 16px}
@@ -87,9 +81,7 @@
   .meta{display:flex;justify-content:space-between;color:#a8a8ab;font-size:12px;margin-top:4px}
   .shareRow{display:flex;gap:6px;margin-top:8px}
   .live{position:absolute;top:8px;left:8px;background:var(--accent2);color:#fff;font-weight:900;padding:2px 6px;font-size:11px}
-  .error{color:#ffb3b3}
   footer{padding:20px;color:#999;text-align:center}
-  .kbd{background:#111;padding:2px 4px;border:1px solid #333;color:#ccc}
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .list{background:#0e0e0f;border:1px solid #222;padding:8px}
   .li{display:flex;justify-content:space-between;border-top:1px solid #222;padding:6px 0}
@@ -110,16 +102,15 @@
       <a href="#" onclick="return false">EXPOSED</a>
     </nav>
     <div class="search">
-      <input id="addrInput" placeholder="Wallet or token 0x... then Analyze">
+      <input id="addrInput" placeholder="Drop a 0x and get undressed">
       <button class="btn accent" id="analyzeBtn">Analyze</button>
       <button class="btn green" id="buyBtn">$PORN Buy</button>
     </div>
   </div>
   <div class="subbar">
     <div class="wrap" style="gap:14px;flex-wrap:wrap">
-      <span>status:</span>
-      <span id="apiStatus" class="muted">ready</span>
-      <span style="margin-left:auto" class="muted">proxy /api/explorer/addresses/{hash}</span>
+      <span id="apiStatus" class="muted">ready to peep</span>
+      <span style="margin-left:auto" class="muted">all peeks are on-chain</span>
     </div>
   </div>
 </header>
@@ -128,41 +119,50 @@
   <div class="row">
     <section class="panel hero">
       <h1>Live wallets exposed</h1>
-      <div class="banner" id="hint">Paste a wallet or token. We classify on the server, craft an erotic background message and persist to Trending.</div>
+      <div class="banner" id="hint">Paste a 0x. We peep. You weep. Rankings update as the crowd watches.</div>
       <div id="grid" class="grid"></div>
 
       <h2 style="margin-top:16px">Trending</h2>
       <div class="cols">
         <div class="list">
-          <div style="font-weight:800;margin-bottom:6px">Wallets</div>
+          <div style="font-weight:800;margin-bottom:6px">Wallets most watched</div>
           <div id="trendWallets"></div>
         </div>
         <div class="list">
-          <div style="font-weight:800;margin-bottom:6px">Tokens</div>
+          <div style="font-weight:800;margin-bottom:6px">Tokens most ogled</div>
           <div id="trendTokens"></div>
         </div>
       </div>
     </section>
 
     <aside class="panel side">
-      <h2>How it works</h2>
-      <p class="muted">1. Server checks tokens and addresses endpoints</p>
-      <p class="muted">2. ABI fallback to detect ERC-20</p>
-      <p class="muted">3. Normalized response with kind wallet or token</p>
-      <p class="muted">4. Persist and build Trending</p>
+      <h2>What is this</h2>
+      <p class="muted">On-chain peep show for degenerates with taste.</p>
+      <p class="muted">Expose your 0x or bring a token to the stage.</p>
+      <p class="muted">If it moves, we rate it. If it dumps, we laugh.</p>
       <hr style="border:0;border-top:1px solid #222;margin:12px 0">
       <button class="btn twitter" id="tweetSite">Tweet the site</button>
     </aside>
   </div>
 </main>
 
-<footer>© PORN • Orion Peep Show • For entertainment only</footer>
+<footer>© PORN • Orion Peep Show • entertainment only</footer>
 
 <script>
 // registra service worker
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
 
-const DEFAULT_USD_RATE = 0.00002;
+let WPLS_USD = 0.00002; // update via backend
+(async function loadPrice(){
+  try{
+    const r = await fetch("/api/price");
+    if(r.ok){
+      const j = await r.json();
+      if (j && j.wplsUsd && Number(j.wplsUsd) > 0) WPLS_USD = Number(j.wplsUsd);
+    }
+  }catch{}
+})();
+
 const MAX_CARDS = 24;
 const PULSEX_BUY_URL = "https://app.pulsex.com/";
 
@@ -175,32 +175,35 @@ const trendTokens  = document.getElementById('trendTokens');
 
 const shortAddr = a => a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){ if(x==null) return 0; const n=Number(x); if(!isFinite(n)) return 0; return n>1e12 ? n/1e18 : n; }
-function pickRate(obj, top){ return Number(obj?.exchange_rate)||Number(obj?.token?.exchange_rate)||Number(top?.exchange_rate)||DEFAULT_USD_RATE; }
 
 function eroticMessage(ctx){
-  const { type, usd, txs, holders, verified, reputation } = ctx;
+  const { type, usd, txs, holders, verified, reputation, name, symbol } = ctx;
   const usdStr = "$"+usd.toLocaleString(undefined,{maximumFractionDigits:2});
   if(type==='wallet'){
     const tier = usd>100000 ? "whale" : usd>10000 ? "alpha" : usd>1000 ? "tease" : usd>100 ? "soft" : "bare";
-    const act  = txs>500 ? "experienced performer" : txs>100 ? "regular flirt" : "shy lurker";
+    const act  = txs>500 ? "experienced" : txs>100 ? "regular" : "shy";
     const mood = usd<10 ? "broke and brazen" : usd>5000 ? "loaded and shameless" : "curious and reckless";
-    return `This wallet goes ${tier}: ${usdStr} on display, ${act}, ${mood}. The window fogs up as it breathes liquidity.`;
+    return `This wallet goes ${tier}. ${usdStr} out in the open. ${act} vibes. ${mood} energy.`;
   }
-  const crowd = holders>50000 ? "packed room screaming for more" : holders>5000 ? "eager audience" : holders>500 ? "intimate crowd" : "private booth";
+  const nm = [symbol, name].filter(Boolean).join(" ");
+  const crowd = holders>50000 ? "crowd goes feral" : holders>5000 ? "room gets loud" : holders>500 ? "intimate claps" : "private booth";
   const badge = verified ? "verified star" : "masked newcomer";
-  const rep   = reputation && reputation!=="ok" ? `with a ${reputation} reputation` : "with clean lights";
-  return `A ${badge} enters the stage for a ${crowd}. Liquidity arches, ${usdStr} teased in view, ${rep}. Will it keep the show or fade the lights?`;
+  const rep   = reputation && reputation!=="ok" ? `dirty rep` : "clean lights";
+  return `${nm} on stage. ${badge} status. ${crowd}. ${rep}. Who is buying the next dance.`;
 }
 
-function composeTitle(address, usd, type){
-  if(type==='token') return `${shortAddr(address)} put a token on stage. Curtains open.`;
-  return `${shortAddr(address)} is showing it all: $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} in liquidity left unlocked.`;
+function titleFor({address, usd, type, name, symbol}){
+  if(type==='token'){
+    const nm = [symbol, name].filter(Boolean).join(" ");
+    return `${nm || 'TOKEN'} is on stage. Watch closely.`;
+  }
+  return `${shortAddr(address)} is showing it all. $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} waving at the glass.`;
 }
 
 async function analyze(addr){
   const url = `/api/explorer/addresses/${addr}`;
   try{
-    apiStatus.textContent = "querying";
+    apiStatus.textContent = "peeking";
     const r = await fetch(url, { headers:{ accept:'application/json' } });
     if(!r.ok){ apiStatus.textContent = "API " + r.status; return; }
     const data = await r.json();
@@ -209,53 +212,55 @@ async function analyze(addr){
     const serverKind = data.kind || (item.is_token ? "token" : (item.is_contract ? "wallet" : "wallet"));
     const isToken = serverKind === "token";
     const token = item.token || {};
+    const name = token.name || null;
+    const symbol = token.symbol || (isToken ? 'TOKEN' : 'WPLS');
     const txs = Number(item.transactions_count||0);
     const holders = Number(token.holders_count||0);
     const verified = !!item.is_verified;
     const reputation = item.reputation || token.reputation || null;
 
-    const bal = toFloat(item.coin_balance);
-    const rate = pickRate(item, data);
-    const usd = isToken ? 0 : bal * rate; // token não usa balance de wallet
+    const balWPLS = toFloat(item.coin_balance);
+    const usd = isToken ? 0 : balWPLS * WPLS_USD;
 
     const type = isToken ? "token" : "wallet";
-    const symbol = token.symbol || (isToken ? 'TOKEN' : 'WPLS');
-    const message = eroticMessage({ type, usd, txs, holders, verified, reputation });
-    const titleLine = composeTitle(addr, usd, type);
+    const message = eroticMessage({ type, usd, txs, holders, verified, reputation, name, symbol });
+    const titleLine = titleFor({ address: addr, usd, type, name, symbol });
 
-    addCard({ address: addr, usd, balance: bal, symbol, message, icon: token.icon_url, type, holders });
+    addCard({ address: addr, usd, balance: balWPLS, symbol, name, message, icon: token.icon_url, type, holders });
 
     await fetch("/api/record", {
       method:"POST", headers:{'content-type':'application/json'},
-      body: JSON.stringify({ address: addr, type, symbol, usd, balance: bal, titleLine, message })
+      body: JSON.stringify({ address: addr, type, symbol, usd, balance: balWPLS, titleLine, message })
     });
 
     loadTrending();
-    apiStatus.textContent = "OK";
+    apiStatus.textContent = "done";
   }catch(e){
     apiStatus.textContent = e.message || "error";
   }
 }
 
-function addCard({address, usd, balance, symbol, message, icon, type, holders}){
+function addCard({address, usd, balance, symbol, name, message, icon, type, holders}){
   const card = document.createElement('div');
   card.className = 'card';
-  const metaRight = type==='token'
-    ? `Holders: ${holders.toLocaleString()}`
-    : `Bal: ${balance.toLocaleString(undefined,{maximumFractionDigits:4})} ${symbol}`;
+  const right = type==='token'
+    ? `Holders ${holders.toLocaleString()}`
+    : `Bal ${balance.toLocaleString(undefined,{maximumFractionDigits:4})} WPLS • $${usd.toLocaleString(undefined,{maximumFractionDigits:2})}`;
+  const headline = type==='token'
+    ? `${[symbol, name].filter(Boolean).join(" ") || 'TOKEN'}`
+    : `${shortAddr(address)}`;
   card.innerHTML = `
     <div class="live">LIVE</div>
     <div class="thumb">${icon ? `<img src="${icon}" alt="token" style="max-height:90%;max-width:90%">` : (type==='token'?'TOKEN':'WALLET')}</div>
-    <div class="titleLine">${composeTitle(address, usd, type)}</div>
-    <div class="meta"><span>Addr: ${shortAddr(address)}</span><span>${metaRight}</span></div>
-    <div class="meta"><span>Type: ${type}</span><span></span></div>
+    <div class="titleLine">${headline}</div>
+    <div class="meta"><span>${type}</span><span>${right}</span></div>
     <div class="banner" style="margin-top:8px">${message}</div>
     <div class="shareRow">
       <button class="btn twitter">Share</button>
       <a class="btn" target="_blank" href="https://scan.pulsechain.com/address/${address}">Explorer</a>
     </div>`;
   card.querySelector('.btn.twitter').onclick = ()=>{
-    const text = composeTitle(address, usd, type) + " " + message + " #PulseChain #WPLS #OrionPeepShow";
+    const text = titleFor({ address, usd, type, name, symbol }) + " " + message + " #PulseChain #WPLS #OrionPeepShow";
     const u = location.origin + location.pathname + "?addr=" + address;
     window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(u),'_blank');
   };
@@ -278,9 +283,7 @@ async function loadTrending(){
 function renderList(el, arr){
   if(!arr || !arr.length){ el.innerHTML = `<div class="muted">no data</div>`; return; }
   el.innerHTML = arr.map(it=>{
-    const t = it.titleLine || `${shortAddr(it.address)} checked`;
-    return `<div class="li"><span>${shortAddr(it.address)} <span class="muted">(${it.type}${it.symbol?": "+it.symbol:""})</span></span><span>x${it.count}</span></div>
-            <div class="muted" style="padding:4px 0">${t}</div>`;
+    return `<div class="li"><span>${shortAddr(it.address)} <span class="muted">(${it.type}${it.symbol?": "+it.symbol:""})</span></span><span>x${it.count}</span></div>`;
   }).join("");
 }
 
@@ -292,7 +295,7 @@ document.getElementById('analyzeBtn').onclick = ()=>{
 };
 addrInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter') document.getElementById('analyzeBtn').click(); });
 document.getElementById('tweetSite').onclick = ()=>{
-  const text = "Watching wallets go full exhibitionist at PORN – Orion Peep Show. Expose yours. #PulseChain #WPLS";
+  const text = "Peeping wallets at PORN. Bring your 0x. #PulseChain #WPLS";
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(location.href),'_blank');
 };
 
