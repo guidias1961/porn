@@ -1,4 +1,7 @@
-// Redireciona chamadas diretas a /api/v2/{addresses|tokens}/0x... para o proxy local
+// v2 — garante atualização e proxy de scanner
+self.addEventListener('install', e => { self.skipWaiting(); });
+self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
+
 self.addEventListener('fetch', event => {
   try{
     const url = new URL(event.request.url);

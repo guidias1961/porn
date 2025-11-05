@@ -1,4 +1,4 @@
-// Orion Peep Show — proxy anti CORS, detecção de token, preço WPLS, Dexscreener p/ métricas, persistência
+// Orion Peep Show — proxy anti-CORS, detecção wallet/token, preço WPLS, Dexscreener, persistência de Trending + Feed
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
@@ -11,11 +11,9 @@ const ROOT = __dirname;
 const PUB = path.join(ROOT, "public");
 const DB_PATH = path.join(ROOT, "db.json");
 
-// Blockscout
 const V2_BASE = (process.env.EXPLORER_V2 || "https://api.scan.pulsechain.com/api/v2").replace(/\/$/, "");
 const ES_BASE = (process.env.EXPLORER_ES || "https://api.scan.pulsechain.com/api").replace(/\/$/, "");
 
-// CSP
 app.use((req, res, next) => {
   res.set(
     "Content-Security-Policy",
@@ -28,9 +26,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// DB
-if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {} }, null, 2));
-const loadDB = () => { try { return JSON.parse(fs.readFileSync(DB_PATH, "utf8")); } catch { return { items: {} }; } };
+if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {}, feed: [] }, null, 2));
+const loadDB = () => {
+  try {
+    const j = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+    if (!j.items) j.items = {};
+    if (!Array.isArray(j.feed)) j.feed = [];
+    return j;
+  } catch { return { items: {}, feed: [] }; }
+};
 const saveDB = (state) => fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2));
 let db = loadDB();
 
@@ -78,7 +82,7 @@ function normalizeTokenFromV2(j, hash){
         icon_url: t.icon_url || t.icon || null,
         exchange_rate: t.exchange_rate || null,
         reputation: "ok",
-        market: null // preenchido via Dexscreener
+        market: null
       },
       is_verified: !!(t.verified || t.is_verified),
       reputation: "ok"
@@ -147,7 +151,7 @@ function normalizeTokenFromES(hash, name, symbol){
   };
 }
 
-// Dexscreener helper
+// Dexscreener
 function pickBestPair(pairs){
   if(!Array.isArray(pairs) || !pairs.length) return null;
   const pulsePairs = pairs.filter(p => (p.chainId||"").toLowerCase().includes("pulse"));
@@ -159,10 +163,8 @@ function pickBestPair(pairs){
 async function enrichWithDexscreener(norm, addr){
   try{
     const ds = await getJSON(`https://api.dexscreener.com/latest/dex/tokens/${addr}`);
-    const pairs = ds.body?.pairs || [];
-    const best = pickBestPair(pairs);
+    const best = pickBestPair(ds.body?.pairs || []);
     if(!best) return norm;
-
     const mkt = {
       price_usd: best.priceUsd ? Number(best.priceUsd) : null,
       liquidity_usd: best.liquidity?.usd ? Number(best.liquidity.usd) : null,
@@ -171,10 +173,8 @@ async function enrichWithDexscreener(norm, addr){
       pair_url: best.url || null,
       dex: best.dexId || null,
       base_symbol: best.baseToken?.symbol || null,
-      base_name: best.baseToken?.name || null,
-      quote_symbol: best.quoteToken?.symbol || null
+      base_name: best.baseToken?.name || null
     };
-
     const item = norm.items[0];
     if(item && item.token){
       item.token.market = mkt;
@@ -185,7 +185,7 @@ async function enrichWithDexscreener(norm, addr){
   return norm;
 }
 
-// preço WPLS com cache
+// preço WPLS
 let priceCache = { val: null, ts: 0, src: "fallback" };
 async function fetchWplsPrice(){
   if (process.env.WPLS_PRICE_USD) {
@@ -210,11 +210,10 @@ app.get("/api/price", async (_req, res) => {
   res.json({ wplsUsd: price, from: src, cached: false });
 });
 
-// endpoint principal com classificação + enriquecimento
+// classificação + enrich
 app.get("/api/explorer/addresses/:hash", async (req, res) => {
   const hash = req.params.hash;
 
-  // 1 tenta token direto
   try{
     const tok = await getJSON(`${V2_BASE}/tokens/${hash}`);
     if (tok.ok && tok.body) {
@@ -225,7 +224,6 @@ app.get("/api/explorer/addresses/:hash", async (req, res) => {
     }
   }catch{}
 
-  // 2 tenta address e, se contrato, tenta tokens novamente
   try{
     const addr = await getJSON(`${V2_BASE}/addresses/${hash}`);
     if (addr.ok && addr.body) {
@@ -246,7 +244,6 @@ app.get("/api/explorer/addresses/:hash", async (req, res) => {
     }
   }catch{}
 
-  // 3 fallback estilo Etherscan
   try{
     const balUrl = `${ES_BASE}?module=account&action=balance&address=${hash}`;
     const abiUrl = `${ES_BASE}?module=contract&action=getabi&address=${hash}`;
@@ -274,10 +271,12 @@ app.get("/api/explorer/addresses/:hash", async (req, res) => {
   }
 });
 
-// persistência
+// persistência (Trending + Feed)
+const FEED_MAX = 200;
 app.post("/api/record", (req, res) => {
-  const { address, type, symbol, usd, balance, titleLine, message } = req.body || {};
+  const { address, type, symbol, name, usd, balance, titleLine, message, icon, holders, market } = req.body || {};
   if (!address || !type) return res.status(400).json({ error: "missing address/type" });
+
   const k = String(address).toLowerCase();
   const prev = db.items[k] || { count: 0 };
   db.items[k] = {
@@ -291,10 +290,36 @@ app.post("/api/record", (req, res) => {
     count: prev.count + 1,
     lastAt: Date.now()
   };
+
+  // grava feed (remove duplicata antiga do mesmo address, mantém ordem por recência)
+  db.feed = db.feed.filter(x => x.address !== k);
+  db.feed.unshift({
+    ts: Date.now(),
+    address: k,
+    type,
+    symbol: symbol || null,
+    name: name || null,
+    usd: typeof usd === "number" ? usd : 0,
+    balance: typeof balance === "number" ? balance : 0,
+    titleLine: titleLine || "",
+    message: message || "",
+    icon: icon || null,
+    holders: typeof holders === "number" ? holders : null,
+    market: market || null
+  });
+  if (db.feed.length > FEED_MAX) db.feed.length = FEED_MAX;
+
   saveDB(db);
   res.json({ ok: true, item: db.items[k] });
 });
 
+// feed persistente
+app.get("/api/feed", (req, res) => {
+  const limit = Math.min(Number(req.query.limit || 24), 100);
+  res.json({ items: db.feed.slice(0, limit), updatedAt: Date.now() });
+});
+
+// trending
 app.get("/api/trending", (req, res) => {
   const limit = Number(req.query.limit || 12);
   const arr = Object.values(db.items);

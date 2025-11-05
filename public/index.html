@@ -70,7 +70,7 @@
   .side{width:360px}
   h1,h2{font-family:'Bebas Neue',sans-serif;margin:0 0 6px;letter-spacing:.3px}
   h1{font-size:34px} h2{font-size:22px}
-  .muted{color:#a0a0a3}
+  .muted{color:var(--muted)}
   .banner{background:#0a0a0a;border:1px dashed #2e2e2e;color:#f7d083;padding:8px 10px}
   .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
   @media (max-width:1100px){.grid{grid-template-columns:repeat(2,1fr)}}
@@ -167,6 +167,7 @@ const trendTokens = document.getElementById('trendTokens');
 
 const shortAddr = a => a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){ if(x==null) return 0; const n=Number(x); if(!isFinite(n)) return 0; return n>1e12 ? n/1e18 : n; }
+function fmtUsd(x){ if(x==null || !isFinite(x)) return ""; return "$"+Number(x).toLocaleString(undefined,{maximumFractionDigits:2}); }
 
 function eroticMessage(ctx){
   const { type, usd, txs, holders, verified, reputation, name, symbol } = ctx;
@@ -192,55 +193,10 @@ function titleFor({address, usd, type, name, symbol}){
   return `${shortAddr(address)} is showing it all. $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} waving at the glass.`;
 }
 
-async function analyze(addr){
-  const url = `/api/explorer/addresses/${addr}`;
-  try{
-    apiStatus.textContent = "peeking";
-    const r = await fetch(url, { headers:{ accept:'application/json' } });
-    if(!r.ok){ apiStatus.textContent = "API " + r.status; return; }
-    const data = await r.json();
-    const item = Array.isArray(data.items) ? (data.items[0]||{}) : data;
-
-    const serverKind = data.kind || (item.is_token ? "token" : (item.is_contract ? "wallet" : "wallet"));
-    const isToken = serverKind === "token";
-    const token = item.token || {};
-    const name = token.name || null;
-    const symbol = token.symbol || (isToken ? 'TOKEN' : 'WPLS');
-    const txs = Number(item.transactions_count||0);
-    const holders = Number(token.holders_count||0) || null;
-    const verified = !!item.is_verified;
-    const reputation = item.reputation || token.reputation || null;
-
-    const balWPLS = toFloat(item.coin_balance);
-    const usd = isToken ? 0 : balWPLS * WPLS_USD;
-
-    const market = token.market || null;
-    const type = isToken ? "token" : "wallet";
-
-    const message = eroticMessage({ type, usd, txs, holders: holders||0, verified, reputation, name, symbol });
-    const titleLine = titleFor({ address: addr, usd, type, name, symbol });
-
-    addCard({ address: addr, usd, balance: balWPLS, symbol, name, message, icon: token.icon_url, type, holders, market });
-
-    await fetch("/api/record", {
-      method:"POST", headers:{'content-type':'application/json'},
-      body: JSON.stringify({ address: addr, type, symbol, usd, balance: balWPLS, titleLine, message })
-    });
-
-    loadTrending();
-    apiStatus.textContent = "done";
-  }catch(e){
-    apiStatus.textContent = e.message || "error";
-  }
-}
-
-function fmtUsd(x){ if(x==null || !isFinite(x)) return ""; return "$"+Number(x).toLocaleString(undefined,{maximumFractionDigits:2}); }
-
 function addCard({address, usd, balance, symbol, name, message, icon, type, holders, market}){
   const card = document.createElement('div');
   card.className = 'card';
 
-  // linha da direita dinâmica
   let right = "";
   if(type==='token'){
     const parts = [];
@@ -275,8 +231,49 @@ function addCard({address, usd, balance, symbol, name, message, icon, type, hold
     const u = location.origin + location.pathname + "?addr=" + address;
     window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(u),'_blank');
   };
-  grid.prepend(card);
-  while(grid.children.length>MAX_CARDS) grid.removeChild(grid.lastChild);
+  grid.appendChild(card);
+  while(grid.children.length>MAX_CARDS) grid.removeChild(grid.firstChild);
+}
+
+async function analyze(addr){
+  const url = `/api/explorer/addresses/${addr}`;
+  try{
+    apiStatus.textContent = "peeking";
+    const r = await fetch(url, { headers:{ accept:'application/json' } });
+    if(!r.ok){ apiStatus.textContent = "API " + r.status; return; }
+    const data = await r.json();
+    const item = Array.isArray(data.items) ? (data.items[0]||{}) : data;
+
+    const serverKind = data.kind || (item.is_token ? "token" : (item.is_contract ? "wallet" : "wallet"));
+    const isToken = serverKind === "token";
+    const token = item.token || {};
+    const name = token.name || null;
+    const symbol = token.symbol || (isToken ? 'TOKEN' : 'WPLS');
+    const txs = Number(item.transactions_count||0);
+    const holders = Number(token.holders_count||0) || null;
+    const verified = !!item.is_verified;
+    const reputation = item.reputation || token.reputation || null;
+    const market = token.market || null;
+
+    const balWPLS = toFloat(item.coin_balance);
+    const usd = isToken ? 0 : balWPLS * WPLS_USD;
+
+    const type = isToken ? "token" : "wallet";
+    const message = eroticMessage({ type, usd, txs, holders: holders||0, verified, reputation, name, symbol });
+    const titleLine = titleFor({ address: addr, usd, type, name, symbol });
+
+    // render e persistir
+    addCard({ address: addr, usd, balance: balWPLS, symbol, name, message, icon: token.icon_url, type, holders, market });
+    await fetch("/api/record", {
+      method:"POST", headers:{'content-type':'application/json'},
+      body: JSON.stringify({ address: addr, type, symbol, name, usd, balance: balWPLS, titleLine, message, icon: token.icon_url, holders, market })
+    });
+
+    loadTrending();
+    apiStatus.textContent = "done";
+  }catch(e){
+    apiStatus.textContent = e.message || "error";
+  }
 }
 
 async function loadTrending(){
@@ -289,6 +286,29 @@ async function loadTrending(){
     trendWallets.innerHTML = `<div class="muted">no data</div>`;
     trendTokens.innerHTML  = `<div class="muted">no data</div>`;
   }
+}
+
+async function loadFeed(){
+  try{
+    const r = await fetch("/api/feed?limit=24");
+    if(!r.ok) return;
+    const j = await r.json();
+    grid.innerHTML = "";
+    (j.items || []).forEach(it=>{
+      addCard({
+        address: it.address,
+        usd: it.usd || 0,
+        balance: it.balance || 0,
+        symbol: it.symbol || null,
+        name: it.name || null,
+        message: it.message || "",
+        icon: it.icon || null,
+        type: it.type,
+        holders: it.holders || null,
+        market: it.market || null
+      });
+    });
+  }catch{}
 }
 
 function renderList(el, arr){
@@ -310,6 +330,7 @@ document.getElementById('tweetSite').onclick = ()=>{
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(location.href),'_blank');
 };
 
+loadFeed();
 loadTrending();
 </script>
 </body>
