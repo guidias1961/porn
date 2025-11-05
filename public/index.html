@@ -54,9 +54,6 @@
   .logoText{display:flex;align-items:baseline;gap:6px;font-family:'Bebas Neue',sans-serif;letter-spacing:.5px}
   .logoText .lhs{background:#000;color:#fff;padding:6px 10px;font-size:30px;line-height:1;border:2px solid #fff}
   .logoText .rhs{background:var(--accent);color:#000;padding:6px 10px;font-size:30px;line-height:1;font-weight:900}
-  .nav{display:flex;gap:16px;margin-left:8px;flex-wrap:wrap}
-  .nav a{color:#ddd;font-weight:700;text-transform:uppercase}
-  .nav a:hover{color:#fff}
   .search{margin-left:auto;display:flex;align-items:center;gap:6px}
   .search input{width:460px;max-width:50vw;background:#0f0f0f;border:1px solid #2a2a2a;color:#e9e9ea;padding:8px 10px;outline:none;font-size:14px;border-radius:0}
   .btn{background:#222;border:1px solid #313131;color:#fff;padding:8px 12px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;border-radius:0}
@@ -64,7 +61,6 @@
   .btn.accent{background:var(--accent);border-color:var(--accent);color:#000}
   .btn.green{background:#0f8c36;border-color:#0f8c36}
   .btn.twitter{background:var(--blue);border-color:var(--blue)}
-  .btn.danger{background:#7a0f0f;border-color:#7a0f0f}
   .subbar{border-top:1px solid #1a1a1a;background:#0a0a0a}
   .subbar .wrap{max-width:1280px;margin:0 auto;padding:8px 16px;display:flex;align-items:center;gap:10px;color:#bbb}
   main{max-width:1280px;margin:0 auto;padding:16px}
@@ -103,15 +99,13 @@
         <div class="lhs">PORN</div><div class="rhs">HUB</div>
       </div>
     </div>
- 
+
     <div class="search">
       <input id="addrInput" placeholder="Drop a 0x and get undressed">
       <button class="btn accent" id="analyzeBtn">Analyze</button>
       <button class="btn green" id="buyBtn">buy</button>
-      <!-- X agora é share no Twitter -->
-      <a class="btn twitter" id="xBtn" href="https://x.com/SEU_HANDLE" target="_blank" rel="noopener">X</a>
-
-
+      <!-- X = link para o Twitter do projeto -->
+      <a class="btn twitter" id="xBtn" href="https://x.com/plsorionnetwork" target="_blank" rel="noopener">X</a>
     </div>
   </div>
   <div class="subbar">
@@ -171,8 +165,7 @@ const apiStatus   = document.getElementById('apiStatus');
 const trendWallets= document.getElementById('trendWallets');
 const trendTokens = document.getElementById('trendTokens');
 
-document.getElementById('buyBtn').onclick   = ()=> window.open(PULSEX_BUY_URL,"_blank");
-
+document.getElementById('buyBtn').onclick = ()=> window.open(PULSEX_BUY_URL,"_blank");
 
 const shortAddr = a => a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){ if(x==null) return 0; const n=Number(x); if(!isFinite(n)) return 0; return n>1e12 ? n/1e18 : n; }
@@ -217,8 +210,15 @@ function pickMedia({ type, usd, market }){
 }
 
 function addCard({address, usd, balance, symbol, name, message, icon, type, holders, market}){
+  const key = String(address || "").toLowerCase();
+
+  // remove card antigo da mesma 0x (dedupe)
+  const prev = grid.querySelector(`.card[data-address="${key}"]`);
+  if (prev) prev.remove();
+
   const card = document.createElement('div');
   card.className = 'card';
+  card.dataset.address = key;
 
   let right = "";
   if(type==='token'){
@@ -239,8 +239,9 @@ function addCard({address, usd, balance, symbol, name, message, icon, type, hold
   const media = pickMedia({ type, usd, market });
   let thumbHTML = "";
   if (media){
-    if (media.kind === 'video'){ thumbHTML = `<video src="${media.src}" muted playsinline autoplay loop></video>`; }
-    else { thumbHTML = `<img src="${media.src}" alt="">`; }
+    thumbHTML = media.kind === 'video'
+      ? `<video src="${media.src}" muted playsinline autoplay loop></video>`
+      : `<img src="${media.src}" alt="">`;
   } else if (icon && type==='token'){
     thumbHTML = `<img src="${icon}" alt="token">`;
   } else {
@@ -260,13 +261,18 @@ function addCard({address, usd, balance, symbol, name, message, icon, type, hold
       ${pairLink}
       <a class="btn" target="_blank" href="https://scan.pulsechain.com/address/${address}">Explorer</a>
     </div>`;
+
   card.querySelector('.btn.twitter').onclick = ()=>{
     const text = titleFor({ address, usd, type, name, symbol }) + " " + message + " #PulseChain #WPLS #PulseOrionNetwork";
     const u = location.origin + location.pathname + "?addr=" + address;
     window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(u),'_blank');
   };
-  grid.appendChild(card);
-  while(grid.children.length>MAX_CARDS) grid.removeChild(grid.firstChild);
+
+  // PREPEND no topo
+  grid.insertBefore(card, grid.firstChild);
+
+  // corta do fim quando passar do limite
+  while (grid.children.length > MAX_CARDS) grid.removeChild(grid.lastChild);
 }
 
 async function analyze(addr){
@@ -321,13 +327,16 @@ async function loadTrending(){
     trendTokens.innerHTML  = `<div class="muted">no data</div>`;
   }
 }
+
 async function loadFeed(){
   try{
     const r = await fetch("/api/feed?limit=24");
     if(!r.ok) return;
     const j = await r.json();
     grid.innerHTML = "";
-    (j.items || []).forEach(it=>{
+    // adiciona do mais antigo para o mais novo, pois addCard faz PREPEND
+    const items = (j.items || []).slice().reverse();
+    for (const it of items){
       addCard({
         address: it.address,
         usd: it.usd || 0,
@@ -340,7 +349,7 @@ async function loadFeed(){
         holders: it.holders || null,
         market: it.market || null
       });
-    });
+    }
   }catch{}
 }
 
