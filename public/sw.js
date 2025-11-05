@@ -1,7 +1,6 @@
-// v2 — garante atualização e proxy de scanner
+// v2 — proxy scanner; mantém compatível com as mudanças
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
-
 self.addEventListener('fetch', event => {
   try{
     const url = new URL(event.request.url);

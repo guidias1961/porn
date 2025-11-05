@@ -1,4 +1,5 @@
-// Orion Peep Show — proxy anti-CORS, detecção wallet/token, preço WPLS, Dexscreener, persistência de Trending + Feed
+// Orion Peep Show — proxy anti-CORS, classificação wallet/token, preço WPLS, Dexscreener,
+// persistência de Trending + Feed, CSP liberando mídia local (png/mp4)
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
@@ -14,11 +15,13 @@ const DB_PATH = path.join(ROOT, "db.json");
 const V2_BASE = (process.env.EXPLORER_V2 || "https://api.scan.pulsechain.com/api/v2").replace(/\/$/, "");
 const ES_BASE = (process.env.EXPLORER_ES || "https://api.scan.pulsechain.com/api").replace(/\/$/, "");
 
+// CSP inclui media-src para vídeos/imagens locais
 app.use((req, res, next) => {
   res.set(
     "Content-Security-Policy",
     "default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; " +
     "img-src 'self' data: https:; " +
+    "media-src 'self' data: blob:; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src https://fonts.gstatic.com; " +
     "connect-src 'self';"
@@ -26,6 +29,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// DB
 if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {}, feed: [] }, null, 2));
 const loadDB = () => {
   try {
@@ -291,7 +295,6 @@ app.post("/api/record", (req, res) => {
     lastAt: Date.now()
   };
 
-  // grava feed (remove duplicata antiga do mesmo address, mantém ordem por recência)
   db.feed = db.feed.filter(x => x.address !== k);
   db.feed.unshift({
     ts: Date.now(),
@@ -313,13 +316,11 @@ app.post("/api/record", (req, res) => {
   res.json({ ok: true, item: db.items[k] });
 });
 
-// feed persistente
 app.get("/api/feed", (req, res) => {
   const limit = Math.min(Number(req.query.limit || 24), 100);
   res.json({ items: db.feed.slice(0, limit), updatedAt: Date.now() });
 });
 
-// trending
 app.get("/api/trending", (req, res) => {
   const limit = Number(req.query.limit || 12);
   const arr = Object.values(db.items);

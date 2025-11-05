@@ -5,8 +5,11 @@
 <title>PORN – Orion Peep Show</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#ff9900">
+<link rel="icon" href="/logo.png" type="image/png">
+<link rel="apple-touch-icon" href="/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 
+<!-- Proxy para evitar chamadas diretas ao scan no client -->
 <script>
 (function(){
   const RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/(addresses|tokens)\/(0x[a-fA-F0-9]{40})\/?$/i;
@@ -47,10 +50,12 @@
   a{color:#5aa9ff;text-decoration:none}
   header{background:#000;border-bottom:2px solid #1a1a1a;color:#fff}
   .topbar{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:10px 16px}
-  .logo{display:flex;align-items:baseline;gap:6px;font-family:'Bebas Neue',sans-serif;letter-spacing:.5px}
-  .logo .lhs{background:#000;color:#fff;padding:6px 10px;font-size:30px;line-height:1;border:2px solid #fff}
-  .logo .rhs{background:var(--accent);color:#000;padding:6px 10px;font-size:30px;line-height:1;font-weight:900}
-  .logo small{display:block;font:600 11px/1 'Open Sans',sans-serif;color:#bbb;margin-left:4px;margin-top:2px}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo img{height:30px;width:30px;object-fit:contain}
+  .logoText{display:flex;align-items:baseline;gap:6px;font-family:'Bebas Neue',sans-serif;letter-spacing:.5px}
+  .logoText .lhs{background:#000;color:#fff;padding:6px 10px;font-size:30px;line-height:1;border:2px solid #fff}
+  .logoText .rhs{background:var(--accent);color:#000;padding:6px 10px;font-size:30px;line-height:1;font-weight:900}
+  .logoText small{display:block;font:600 11px/1 'Open Sans',sans-serif;color:#bbb;margin-left:4px;margin-top:2px}
   .nav{display:flex;gap:16px;margin-left:8px;flex-wrap:wrap}
   .nav a{color:#ddd;font-weight:700;text-transform:uppercase}
   .nav a:hover{color:#fff}
@@ -61,6 +66,7 @@
   .btn.accent{background:var(--accent);border-color:var(--accent);color:#000}
   .btn.green{background:#0f8c36;border-color:#0f8c36}
   .btn.twitter{background:var(--blue);border-color:var(--blue)}
+  .btn.danger{background:#7a0f0f;border-color:#7a0f0f}
   .subbar{border-top:1px solid #1a1a1a;background:#0a0a0a}
   .subbar .wrap{max-width:1280px;margin:0 auto;padding:8px 16px;display:flex;align-items:center;gap:10px;color:#bbb}
   main{max-width:1280px;margin:0 auto;padding:16px}
@@ -76,7 +82,8 @@
   @media (max-width:1100px){.grid{grid-template-columns:repeat(2,1fr)}}
   @media (max-width:820px){.grid{grid-template-columns:1fr} .side{display:none}}
   .card{background:var(--panel2);border:1px solid #2a2a2a;padding:8px;position:relative}
-  .thumb{background:#070707;border:1px solid #222;height:120px;display:flex;align-items:center;justify-content:center;color:#666;font-weight:700}
+  .thumb{background:#070707;border:1px solid #222;height:120px;display:flex;align-items:center;justify-content:center;color:#666;font-weight:700;overflow:hidden}
+  .thumb img,.thumb video{width:100%;height:100%;object-fit:cover;display:block}
   .titleLine{margin-top:8px;font-weight:800;color:#fff}
   .meta{display:flex;justify-content:space-between;color:#a8a8ab;font-size:12px;margin-top:4px;gap:12px;flex-wrap:wrap}
   .shareRow{display:flex;gap:6px;margin-top:8px}
@@ -92,8 +99,10 @@
 <header>
   <div class="topbar">
     <div class="logo">
-      <div class="lhs">PORN</div><div class="rhs">HUB</div>
-      <small>Pulse Orion Network • Orion Peep Show</small>
+      <img src="/logo.png" alt="logo">
+      <div class="logoText">
+        <div class="lhs">PORN</div><div class="rhs">HUB</div>
+      </div>
     </div>
     <nav class="nav">
       <a href="#" onclick="return false">TRENDING</a>
@@ -104,7 +113,8 @@
     <div class="search">
       <input id="addrInput" placeholder="Drop a 0x and get undressed">
       <button class="btn accent" id="analyzeBtn">Analyze</button>
-      <button class="btn green" id="buyBtn">$PORN Buy</button>
+      <button class="btn green" id="buyBtn">buy</button>
+      <button class="btn danger" id="closeBtn">X</button>
     </div>
   </div>
   <div class="subbar">
@@ -165,6 +175,12 @@ const apiStatus   = document.getElementById('apiStatus');
 const trendWallets= document.getElementById('trendWallets');
 const trendTokens = document.getElementById('trendTokens');
 
+document.getElementById('buyBtn').onclick   = ()=> window.open(PULSEX_BUY_URL,"_blank");
+document.getElementById('closeBtn').onclick = ()=>{
+  addrInput.value = "";
+  grid.innerHTML = "";
+};
+
 const shortAddr = a => a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){ if(x==null) return 0; const n=Number(x); if(!isFinite(n)) return 0; return n>1e12 ? n/1e18 : n; }
 function fmtUsd(x){ if(x==null || !isFinite(x)) return ""; return "$"+Number(x).toLocaleString(undefined,{maximumFractionDigits:2}); }
@@ -193,10 +209,26 @@ function titleFor({address, usd, type, name, symbol}){
   return `${shortAddr(address)} is showing it all. $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} waving at the glass.`;
 }
 
+// Escolha da mídia por regras solicitadas
+function pickMedia({ type, usd, market }){
+  if(type === 'token'){
+    const mc = Number(market?.market_cap_usd || 0);
+    if (mc > 1_000_000) return { kind: 'video', src: '/2.mp4' };
+    if (mc > 100_000)  return { kind: 'video', src: '/1.mp4' };
+    if (mc > 0 && mc < 100_000) return { kind: 'image', src: '/3.png' };
+    return null;
+  } else {
+    if (usd > 100_000) return { kind: 'video', src: '/3.mp4' };
+    if (usd > 100)     return { kind: 'image', src: '/1.png' };
+    return { kind: 'image', src: '/2.png' };
+  }
+}
+
 function addCard({address, usd, balance, symbol, name, message, icon, type, holders, market}){
   const card = document.createElement('div');
   card.className = 'card';
 
+  // right meta
   let right = "";
   if(type==='token'){
     const parts = [];
@@ -213,11 +245,25 @@ function addCard({address, usd, balance, symbol, name, message, icon, type, hold
     ? `${[symbol, name].filter(Boolean).join(" ") || 'TOKEN'}`
     : `${shortAddr(address)}`;
 
+  const media = pickMedia({ type, usd, market });
+  let thumbHTML = "";
+  if (media){
+    if (media.kind === 'video'){
+      thumbHTML = `<video src="${media.src}" muted playsinline autoplay loop></video>`;
+    } else {
+      thumbHTML = `<img src="${media.src}" alt="">`;
+    }
+  } else if (icon && type==='token'){
+    thumbHTML = `<img src="${icon}" alt="token">`;
+  } else {
+    thumbHTML = (type==='token'?'TOKEN':'WALLET');
+  }
+
   const pairLink = market?.pair_url ? `<a class="btn" target="_blank" href="${market.pair_url}">Pair</a>` : "";
 
   card.innerHTML = `
     <div class="live">LIVE</div>
-    <div class="thumb">${icon ? `<img src="${icon}" alt="token" style="max-height:90%;max-width:90%">` : (type==='token'?'TOKEN':'WALLET')}</div>
+    <div class="thumb">${thumbHTML}</div>
     <div class="titleLine">${headline}</div>
     <div class="meta"><span>${type}</span><span>${right}</span></div>
     <div class="banner" style="margin-top:8px">${message}</div>
@@ -247,8 +293,8 @@ async function analyze(addr){
     const serverKind = data.kind || (item.is_token ? "token" : (item.is_contract ? "wallet" : "wallet"));
     const isToken = serverKind === "token";
     const token = item.token || {};
-    const name = token.name || null;
-    const symbol = token.symbol || (isToken ? 'TOKEN' : 'WPLS');
+    const tName = token.name || null;
+    const tSym  = token.symbol || (isToken ? 'TOKEN' : 'WPLS');
     const txs = Number(item.transactions_count||0);
     const holders = Number(token.holders_count||0) || null;
     const verified = !!item.is_verified;
@@ -259,14 +305,14 @@ async function analyze(addr){
     const usd = isToken ? 0 : balWPLS * WPLS_USD;
 
     const type = isToken ? "token" : "wallet";
-    const message = eroticMessage({ type, usd, txs, holders: holders||0, verified, reputation, name, symbol });
-    const titleLine = titleFor({ address: addr, usd, type, name, symbol });
+    const message = eroticMessage({ type, usd, txs, holders: holders||0, verified, reputation, name: tName, symbol: tSym });
+    const titleLine = titleFor({ address: addr, usd, type, name: tName, symbol: tSym });
 
-    // render e persistir
-    addCard({ address: addr, usd, balance: balWPLS, symbol, name, message, icon: token.icon_url, type, holders, market });
+    addCard({ address: addr, usd, balance: balWPLS, symbol: tSym, name: tName, message, icon: token.icon_url, type, holders, market });
+
     await fetch("/api/record", {
       method:"POST", headers:{'content-type':'application/json'},
-      body: JSON.stringify({ address: addr, type, symbol, name, usd, balance: balWPLS, titleLine, message, icon: token.icon_url, holders, market })
+      body: JSON.stringify({ address: addr, type, symbol: tSym, name: tName, usd, balance: balWPLS, titleLine, message, icon: token.icon_url, holders, market })
     });
 
     loadTrending();
@@ -287,7 +333,6 @@ async function loadTrending(){
     trendTokens.innerHTML  = `<div class="muted">no data</div>`;
   }
 }
-
 async function loadFeed(){
   try{
     const r = await fetch("/api/feed?limit=24");
@@ -318,7 +363,6 @@ function renderList(el, arr){
   }).join("");
 }
 
-document.getElementById('buyBtn').onclick = ()=> window.open(PULSEX_BUY_URL,"_blank");
 document.getElementById('analyzeBtn').onclick = ()=>{
   const a = addrInput.value.trim();
   if(!/^0x[a-fA-F0-9]{40}$/.test(a)){ alert('Paste a valid 0x address'); return; }
