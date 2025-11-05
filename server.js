@@ -1,4 +1,4 @@
-// Orion Peep Show — backend com proxy anti-CORS, CSP e persistência simples
+// Orion Peep Show — backend com proxy anti-CORS, CSP e persistência
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");

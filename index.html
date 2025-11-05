@@ -6,6 +6,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#ff9900">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+
+<!-- Monkey-patch no topo: reescreve QUALQUER fetch/XHR/Request para o proxy local -->
+<script>
+(function(){
+  const ADDR_RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/addresses\/(0x[a-fA-F0-9]{40})\/?$/i;
+  function toLocal(u){ const m = u && u.match(ADDR_RE); return m ? `/api/explorer/addresses/${m[1]}` : null; }
+
+  const _fetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    try{
+      const url = typeof input === 'string' ? input : input && input.url;
+      const local = toLocal(url);
+      if(local) return _fetch(local, init);
+    }catch(_){}
+    return _fetch(input, init);
+  };
+
+  const _open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url){
+    try{
+      const local = toLocal(url);
+      if(local) arguments[1] = local;
+    }catch(_){}
+    return _open.apply(this, arguments);
+  };
+
+  const _Request = window.Request;
+  window.Request = new Proxy(_Request, {
+    construct(target, args){
+      try{
+        if(args && typeof args[0] === 'string'){
+          const local = toLocal(args[0]);
+          if(local) args[0] = local;
+        }
+      }catch(_){}
+      return new target(...args);
+    }
+  });
+})();
+</script>
+
 <style>
   :root{--bg:#0b0b0c;--panel:#111112;--panel2:#1c1c1e;--text:#e9e9ea;--muted:#a0a0a3;--accent:#ff9900;--accent2:#ff0066;--blue:#1d9bf0}
   *{box-sizing:border-box} html,body{height:100%}
@@ -119,22 +160,10 @@
 <footer>© PORN • Orion Peep Show • For entertainment only</footer>
 
 <script>
-/* Reescreve qualquer fetch direto ao explorer para o proxy local */
-(function(){
-  const EXPLORER_RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/addresses\/(0x[a-fA-F0-9]{40})\/?$/i;
-  const _fetch = window.fetch.bind(window);
-  window.fetch = function(input, init){
-    try{
-      const url = typeof input === 'string' ? input : input.url;
-      const m = url && url.match(EXPLORER_RE);
-      if(m){
-        const local = `/api/explorer/addresses/${m[1]}`;
-        return _fetch(local, init);
-      }
-    }catch(_){}
-    return _fetch(input, init);
-  };
-})();
+// registra service worker para interceptar chamadas externas residuais
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
 
 const DEFAULT_USD_RATE = 0.00002;
 const MAX_CARDS = 24;
@@ -171,6 +200,7 @@ function composeTitle(address, usd){
 }
 
 async function analyze(addr){
+  // sempre via proxy local
   const url = `/api/explorer/addresses/${addr}`;
   try{
     apiStatus.textContent = "querying";
