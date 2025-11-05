@@ -1,4 +1,4 @@
-// Orion Peep Show — backend com proxy anti-CORS, CSP e persistência em arquivo
+// Orion Peep Show — backend com proxy anti-CORS, CSP e persistência simples
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
@@ -11,10 +11,10 @@ const ROOT = __dirname;
 const PUB = path.join(ROOT, "public");
 const DB_PATH = path.join(ROOT, "db.json");
 
-// Explorer padrão (pode ajustar via EXPLORER_BASE se quiser)
+// Explorer padrão. Pode sobrescrever com EXPLORER_BASE
 const DEFAULT_EXPLORER_BASE = (process.env.EXPLORER_BASE || "https://scan.pulsechain.com/api/v2").replace(/\/$/, "");
 
-// Segurança: só permite conexões XHR para o próprio domínio
+// CSP: só permite XHR para o próprio domínio
 app.use((req, res, next) => {
   res.set(
     "Content-Security-Policy",
@@ -27,10 +27,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// DB simples em arquivo
+// DB simples
 if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {} }, null, 2));
-const loadDB = () => { try { return JSON.parse(fs.readFileSync(DB_PATH, "utf8")); } catch { return { items: {} }; } };
-const saveDB = (state) => fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2));
+function loadDB() { try { return JSON.parse(fs.readFileSync(DB_PATH, "utf8")); } catch { return { items: {} }; } }
+function saveDB(state) { fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2)); }
 let db = loadDB();
 
 app.use(cors());
@@ -39,12 +39,14 @@ app.use(express.static(PUB, { index: "index.html", extensions: ["html"] }));
 
 app.get("/healthz", (_req, res) => res.type("text").send("ok"));
 
-// Proxy anti-CORS: o front SEMPRE deve chamar isto
+// Proxy anti-CORS
 app.get("/api/explorer/addresses/:hash", async (req, res) => {
   const base = (req.query.base || DEFAULT_EXPLORER_BASE).replace(/\/$/, "");
   const hash = req.params.hash;
-  const urls = [`${base}/addresses/${hash}`, `${base}/addresses/${hash}/`];
-
+  const urls = [
+    `${base}/addresses/${hash}`,
+    `${base}/addresses/${hash}/`
+  ];
   for (const url of urls) {
     try {
       const r = await fetch(url, {
@@ -55,12 +57,13 @@ app.get("/api/explorer/addresses/:hash", async (req, res) => {
       res.set("x-proxy-source", url);
       res.status(r.status).type("application/json").send(text);
       return;
-    } catch (_) { /* tenta próxima variação */ }
+    } catch (_) { /* tenta próxima */ }
   }
   res.status(502).json({ error: "proxy_fetch_failed", base, hash });
 });
 
-// Persistência para o Trending
+// Persistência para Trending
+// body: { address, type: 'wallet'|'token', symbol, usd, balance, titleLine, message }
 app.post("/api/record", (req, res) => {
   const { address, type, symbol, usd, balance, titleLine, message } = req.body || {};
   if (!address || !type) return res.status(400).json({ error: "missing address/type" });
@@ -81,6 +84,7 @@ app.post("/api/record", (req, res) => {
   res.json({ ok: true, item: db.items[k] });
 });
 
+// Trending
 app.get("/api/trending", (req, res) => {
   const limit = Number(req.query.limit || 12);
   const arr = Object.values(db.items);

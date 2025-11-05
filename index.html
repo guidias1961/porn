@@ -88,7 +88,7 @@
   <div class="row">
     <section class="panel hero">
       <h1>Live wallets exposed</h1>
-      <div class="banner" id="hint">Paste a wallet or token. We call the explorer through our proxy, craft an erotic background message based on behavior, and record it server-side to build Trending.</div>
+      <div class="banner" id="hint">Paste a wallet or token. We call the explorer through our proxy, craft an erotic background message based on behavior, and record it server side to build Trending.</div>
       <div id="grid" class="grid"></div>
 
       <h2 style="margin-top:16px">Trending</h2>
@@ -119,6 +119,23 @@
 <footer>© PORN • Orion Peep Show • For entertainment only</footer>
 
 <script>
+/* Reescreve qualquer fetch direto ao explorer para o proxy local */
+(function(){
+  const EXPLORER_RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/addresses\/(0x[a-fA-F0-9]{40})\/?$/i;
+  const _fetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    try{
+      const url = typeof input === 'string' ? input : input.url;
+      const m = url && url.match(EXPLORER_RE);
+      if(m){
+        const local = `/api/explorer/addresses/${m[1]}`;
+        return _fetch(local, init);
+      }
+    }catch(_){}
+    return _fetch(input, init);
+  };
+})();
+
 const DEFAULT_USD_RATE = 0.00002;
 const MAX_CARDS = 24;
 const PULSEX_BUY_URL = "https://app.pulsex.com/";
@@ -130,12 +147,12 @@ const apiStatus = document.getElementById('apiStatus');
 const trendWallets = document.getElementById('trendWallets');
 const trendTokens  = document.getElementById('trendTokens');
 
-const shortAddr = (a)=> a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
+const shortAddr = a => a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){ if(x==null) return 0; const n=Number(x); if(!isFinite(n)) return 0; return n>1e12 ? n/1e18 : n; }
-function pickRate(obj, topLevel){ return Number(obj?.exchange_rate)||Number(obj?.token?.exchange_rate)||Number(topLevel?.exchange_rate)||DEFAULT_USD_RATE; }
+function pickRate(obj, top){ return Number(obj?.exchange_rate)||Number(obj?.token?.exchange_rate)||Number(top?.exchange_rate)||DEFAULT_USD_RATE; }
 
 function eroticMessage(ctx){
-  const { type, usd, balance, txs, holders, verified, reputation } = ctx;
+  const { type, usd, txs, holders, verified, reputation } = ctx;
   const usdStr = "$"+usd.toLocaleString(undefined,{maximumFractionDigits:2});
   if(type==='wallet'){
     const tier = usd>100000 ? "whale" : usd>10000 ? "alpha" : usd>1000 ? "tease" : usd>100 ? "soft" : "bare";
@@ -154,11 +171,10 @@ function composeTitle(address, usd){
 }
 
 async function analyze(addr){
-  // PROXY sempre. Nunca chama domínio externo do front.
   const url = `/api/explorer/addresses/${addr}`;
   try{
     apiStatus.textContent = "querying";
-    const r = await fetch(url, {headers:{accept:'application/json'}});
+    const r = await fetch(url, { headers:{ accept:'application/json' } });
     if(!r.ok){ apiStatus.textContent = "API " + r.status; return; }
     const data = await r.json();
     const item = Array.isArray(data.items) ? (data.items[0]||{}) : data;
@@ -176,7 +192,7 @@ async function analyze(addr){
 
     const type = (isContract && token.symbol) ? "token" : "wallet";
     const symbol = token.symbol || (type==='token' ? 'TOKEN' : 'WPLS');
-    const message = eroticMessage({ type, usd, balance: bal, txs, holders, verified, reputation });
+    const message = eroticMessage({ type, usd, txs, holders, verified, reputation });
     const titleLine = composeTitle(addr, usd);
 
     addCard({ address: addr, usd, balance: bal, symbol, message, icon: token.icon_url, type });
@@ -189,7 +205,7 @@ async function analyze(addr){
     loadTrending();
     apiStatus.textContent = "OK";
   }catch(e){
-    apiStatus.textContent = e.message||e;
+    apiStatus.textContent = e.message || "error";
   }
 }
 
