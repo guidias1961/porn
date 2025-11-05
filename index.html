@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orion Peep Show — Live Wallets Exposed</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f90">
+<!-- Ethers v5 -->
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+<style>
+  :root {
+    --bg:#0a0a0c;
+    --card:#111114;
+    --muted:#9aa0a6;
+    --accent:#ff9900;
+    --accent2:#ff0066;
+    --ok:#20c997;
+    --bad:#ff4757;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:#fff;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  a{color:#fff;text-decoration:none}
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px;background:#000;border-bottom:2px solid #1a1a1a;position:sticky;top:0;z-index:10
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px}
+  .brand .hub{color:#fff;background:#222;padding:2px 6px;border-radius:4px}
+  .brand .porn{color:#000;background:var(--accent);padding:2px 6px;border-radius:4px}
+  .brand small{display:block;color:var(--muted);font-weight:600;font-size:11px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{
+    background:#1b1b1e;border:1px solid #2a2a2f;color:#fff;
+    padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:700
+  }
+  .btn:hover{border-color:#3a3a40}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#000}
+  .btn.twitter{background:#1d9bf0;border-color:#1d9bf0}
+  .btn.buy{background:#00c853;border-color:#00c853}
+  .btn.danger{background:#2a0f16;border-color:#701a2a;color:#ffb3c4}
+  main{max-width:1200px;margin:0 auto;padding:16px}
+  .hero{
+    display:grid;grid-template-columns:1.2fr .8fr;gap:16px;margin-top:8px
+  }
+  .hero .panel{
+    background:linear-gradient(180deg, #0f0f12, #0b0b0d);
+    border:1px solid #1e1e24;border-radius:14px;padding:18px
+  }
+  .title{font-size:28px;font-weight:900;line-height:1.1;margin:0 0 8px}
+  .subtitle{color:var(--muted);font-size:14px;margin:0}
+  .status{margin-top:10px;font-size:13px;color:var(--muted)}
+  .grid{
+    display:grid;gap:14px;margin-top:18px;
+    grid-template-columns:repeat(3,minmax(0,1fr))
+  }
+  @media (max-width:980px){ .hero{grid-template-columns:1fr} .grid{grid-template-columns:1fr 1fr} }
+  @media (max-width:640px){ .grid{grid-template-columns:1fr} }
+  .card{
+    background:radial-gradient(130% 140% at 0% 0%, rgba(255,153,0,0.08), rgba(255,0,102,0.05) 60%, rgba(0,0,0,0.4) 100%), #0c0c0f;
+    border:1px solid #222;border-radius:14px;padding:14px;position:relative;overflow:hidden
+  }
+  .liveTag{
+    position:absolute;top:10px;right:-30px;transform:rotate(35deg);
+    background:var(--accent2);color:#fff;padding:4px 40px;font-weight:900;font-size:12px;
+    box-shadow:0 0 14px rgba(255,0,102,.4)
+  }
+  .addr{font-weight:800;font-size:16px}
+  .row{display:flex;justify-content:space-between;gap:10px;margin-top:6px}
+  .muted{color:var(--muted);font-size:12px}
+  .price{font-weight:800}
+  .banner{
+    margin:14px 0;padding:10px;border-radius:10px;border:1px dashed #2a2a2f;
+    color:#ffcf33;background:rgba(255,153,0,.05)
+  }
+  footer{padding:20px;color:#888;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="porn">PORN</span><span class="hub">Orion Peep Show</span>
+    <small>Contract-based exhibitionism</small>
+  </div>
+  <div class="actions">
+    <button id="buyBtn" class="btn buy">Buy $PORN</button>
+    <button id="tweetBtn" class="btn twitter">Tweet</button>
+    <button id="connectBtn" class="btn">Connect</button>
+    <button id="exposeBtn" class="btn primary" disabled>Expose Me</button>
+    <button id="coverBtn" class="btn danger" disabled>Cover me 24h</button>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="panel">
+      <h1 class="title">Live wallets exposed</h1>
+      <p class="subtitle">Flip the switch. Show your address and WPLS balance in the neon window. Pay a fee to hide for 24 hours. Pure on-chain voyeurism.</p>
+      <div class="banner" id="networkMsg">Checking network…</div>
+      <div class="status" id="userStatus">Not connected</div>
+      <div class="status" id="feeStatus"></div>
+    </div>
+    <div class="panel">
+      <div class="title" style="font-size:20px">How it works</div>
+      <ul class="subtitle" style="margin:6px 0 0 18px;line-height:1.5">
+        <li>Click <b>Expose Me</b> to mark your wallet as exposed in the smart contract.</li>
+        <li>Your address and <b>WPLS</b> balance are shown publicly on this page.</li>
+        <li>Click <b>Cover me 24h</b> and pay the fee in PLS to hide for 24 hours.</li>
+        <li>Everything is on-chain. No accounts. No off-chain DB.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section style="margin-top:16px">
+    <div class="row">
+      <div class="subtitle">Feed updates automatically. Last refresh: <span id="lastRefresh">–</span></div>
+      <div>
+        <button id="refreshBtn" class="btn">Refresh</button>
+      </div>
+    </div>
+    <div class="grid" id="cards"></div>
+  </section>
+</main>
+
+<footer>
+  Orion Peep Show • WPLS contract used for balances • PulseChain chainId 369 • For entertainment only
+</footer>
+
+<script>
+/** ========= CONFIG ========= **/
+const PEEP_CONTRACT = "0x61b77837B880D70F7daffB751568389B3EcCb784"; // TODO set after deploy
+const PORN_TOKEN   = "0x";              // optional, for Buy button
+const WPLS_TOKEN   = "0xA1077a294dDE1B09bB078844df40758a5D0f9a27"; // WPLS on PulseChain
+const PULSE_CHAIN  = 369;
+const DEFAULT_PRICE_USD = 0.00002; // fallback if price API blocked
+
+/** ====== ABIs ====== **/
+const PEEP_ABI = [
+  "function coverFee() view returns (uint256)",
+  "function expose() external",
+  "function cover() external payable",
+  "function isExposed(address) view returns (bool)",
+  "function coverUntil(address) view returns (uint256)",
+  "event Exposed(address indexed who)",
+  "event Covered(address indexed who, uint256 until)"
+];
+
+const ERC20_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)"
+];
+
+/** ====== State ====== **/
+let provider, signer, myAddr = null;
+let peep, wpls;
+let priceUSD = DEFAULT_PRICE_USD;
+let lastBlock = 0;
+
+/** ====== UI elements ====== **/
+const el = (id)=>document.getElementById(id);
+const networkMsg = el('networkMsg');
+const userStatus = el('userStatus');
+const feeStatus  = el('feeStatus');
+const cards      = el('cards');
+
+/** ====== Chain helpers ====== **/
+async function ensurePulseChain() {
+  if (!window.ethereum) { networkMsg.textContent = "Install MetaMask"; return false; }
+  const chainId = await ethereum.request({ method: 'eth_chainId' });
+  const num = parseInt(chainId, 16);
+  if (num !== PULSE_CHAIN) {
+    networkMsg.innerHTML = "Wrong network. Click to add/switch to PulseChain.";
+    networkMsg.style.cursor = 'pointer';
+    networkMsg.onclick = async () => {
+      try {
+        await ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0x171', // 369
+            chainName: 'PulseChain',
+            rpcUrls: ['https://rpc.pulsechain.com'],
+            nativeCurrency: { name: 'Pulse', symbol: 'PLS', decimals: 18 },
+            blockExplorerUrls: ['https://scan.pulsechain.com']
+          }]
+        });
+      } catch(e) { console.log(e); }
+    };
+    return false;
+  }
+  networkMsg.textContent = "PulseChain OK";
+  return true;
+}
+
+async function setup() {
+  const ok = await ensurePulseChain();
+  if (!ok) return;
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  wpls = new ethers.Contract(WPLS_TOKEN, ERC20_ABI, provider);
+  if (PEEP_CONTRACT && PEEP_CONTRACT.startsWith('0x')) {
+    peep = new ethers.Contract(PEEP_CONTRACT, PEEP_ABI, provider);
+    try {
+      const fee = await peep.coverFee();
+      feeStatus.textContent = "Current cover fee: " + ethers.utils.formatUnits(fee, 18) + " PLS";
+    } catch(e) {
+      feeStatus.textContent = "Cover fee: n/a (set PEEP_CONTRACT address)";
+    }
+  } else {
+    feeStatus.textContent = "Set PEEP_CONTRACT to interact on-chain";
+  }
+  fetchPrice();
+  refreshFeed();
+  setInterval(refreshFeed, 30000);
+}
+
+async function fetchPrice(){
+  try {
+    // Coingecko simple price API
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=wrapped-pulse&vs_currencies=usd");
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j["wrapped-pulse"] && j["wrapped-pulse"].usd) {
+      priceUSD = Number(j["wrapped-pulse"].usd);
+    }
+  } catch(e) { /* keep default */ }
+}
+
+/** ====== Feed: read events and compose cards ====== **/
+async function refreshFeed() {
+  if (!peep) { cards.innerHTML = `<div class="subtitle">Set PEEP_CONTRACT to load on-chain feed.</div>`; return; }
+  try {
+    const latest = await provider.getBlockNumber();
+    const from = Math.max(0, latest - 120000); // ~ last few days
+    // topics for Exposed(address)
+    const topicExposed = ethers.utils.id("Exposed(address)");
+    const logs = await provider.getLogs({ fromBlock: from, toBlock: 'latest', address: PEEP_CONTRACT, topics: [topicExposed] });
+    // decode who addresses and dedupe (latest first)
+    const iface = new ethers.utils.Interface(PEEP_ABI);
+    const addrs = [];
+    for (let i = logs.length - 1; i >= 0 && addrs.length < 24; i--) {
+      const log = logs[i];
+      try {
+        const parsed = iface.parseLog(log);
+        const who = parsed.args.who;
+        if (!addrs.includes(who)) addrs.push(who);
+      } catch(_) {}
+    }
+    // filter only actually exposed now (not covered)
+    const live = [];
+    for (const a of addrs) {
+      const exposedNow = await peep.isExposed(a);
+      if (exposedNow) live.push(a);
+      if (live.length >= 12) break;
+    }
+    // render
+    cards.innerHTML = "";
+    if (live.length === 0) {
+      cards.innerHTML = `<div class="subtitle">No one is currently exposed. Be the first.</div>`;
+    } else {
+      for (const a of live) {
+        const wp = await wpls.balanceOf(a);
+        const w = Number(ethers.utils.formatUnits(wp, 18));
+        const usd = w * priceUSD;
+        const short = a.slice(0,6) + "..." + a.slice(-4);
+        const line = `${short} is showing it all — $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} in liquidity left unlocked.`;
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="liveTag">LIVE</div>
+          <div class="addr">${short}</div>
+          <div class="row"><span class="muted">WPLS</span><span class="price">${w.toLocaleString(undefined,{maximumFractionDigits:4})}</span></div>
+          <div class="row"><span class="muted">USD est.</span><span class="price">$${usd.toLocaleString(undefined,{maximumFractionDigits:2})}</span></div>
+          <div class="muted" style="margin-top:8px">${line}</div>
+          <div class="row" style="margin-top:10px">
+            <a class="btn" target="_blank" href="https://scan.pulsechain.com/address/${a}">Explorer</a>
+            <a class="btn" target="_blank" href="https://app.pulsex.com">Watch chart</a>
+          </div>
+        `;
+        cards.appendChild(card);
+      }
+    }
+    el('lastRefresh').textContent = new Date().toLocaleTimeString();
+    lastBlock = latest;
+  } catch(e) {
+    cards.innerHTML = `<div class="subtitle">Error loading feed. ${e.message || e}</div>`;
+  }
+}
+
+/** ====== Wallet actions ====== **/
+el('connectBtn').onclick = async ()=>{
+  if (!window.ethereum) { alert('Install MetaMask'); return; }
+  await ensurePulseChain();
+  const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+  myAddr = accounts[0];
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  signer = provider.getSigner();
+  userStatus.textContent = "Connected: " + myAddr;
+  if (PEEP_CONTRACT && PEEP_CONTRACT.startsWith('0x')) {
+    peep = new ethers.Contract(PEEP_CONTRACT, PEEP_ABI, signer);
+    wpls = new ethers.Contract(WPLS_TOKEN, ERC20_ABI, provider);
+    el('exposeBtn').disabled = false;
+    el('coverBtn').disabled = false;
+    try {
+      const fee = await peep.coverFee();
+      feeStatus.textContent = "Current cover fee: " + ethers.utils.formatUnits(fee, 18) + " PLS";
+    } catch(e){}
+  }
+};
+
+el('exposeBtn').onclick = async ()=>{
+  if (!peep) return alert('Set PEEP_CONTRACT');
+  try {
+    const tx = await peep.expose();
+    el('exposeBtn').textContent = 'Exposing...';
+    await tx.wait();
+    el('exposeBtn').textContent = 'Expose Me';
+    refreshFeed();
+  } catch(e){ alert(e.message || e); el('exposeBtn').textContent = 'Expose Me'; }
+};
+
+el('coverBtn').onclick = async ()=>{
+  if (!peep) return alert('Set PEEP_CONTRACT');
+  try {
+    const fee = await peep.coverFee();
+    const tx = await peep.cover({ value: fee });
+    el('coverBtn').textContent = 'Covering...';
+    await tx.wait();
+    el('coverBtn').textContent = 'Cover me 24h';
+    refreshFeed();
+  } catch(e){ alert(e.message || e); el('coverBtn').textContent = 'Cover me 24h'; }
+};
+
+/** ====== Aux buttons ====== **/
+el('refreshBtn').onclick = ()=>refreshFeed();
+el('tweetBtn').onclick = ()=>{
+  const t = encodeURIComponent("I just went full on-chain exhibitionist at Orion Peep Show. Come watch the wallets expose themselves. #PulseChain #WPLS");
+  window.open("https://twitter.com/intent/tweet?text="+t, "_blank");
+};
+el('buyBtn').onclick = ()=>{
+  // Deep-link to PulseX swap with PORN token as output when set
+  if (PORN_TOKEN.startsWith('0x')) {
+    window.open(`https://app.pulsex.com/#/swap?outputCurrency=${PORN_TOKEN}`, "_blank");
+  } else {
+    window.open("https://app.pulsex.com/", "_blank");
+  }
+};
+
+window.addEventListener('load', setup);
+</script>
+</body>
+</html>
+
