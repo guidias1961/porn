@@ -6,6 +6,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#ff9900">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+
+<!-- Monkey-patch no topo: reescreve QUALQUER fetch/XHR/Request para o proxy local -->
+<script>
+(function(){
+  const ADDR_RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/addresses\/(0x[a-fA-F0-9]{40})\/?$/i;
+  function toLocal(u){ const m = u && u.match(ADDR_RE); return m ? `/api/explorer/addresses/${m[1]}` : null; }
+
+  const _fetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    try{
+      const url = typeof input === 'string' ? input : input && input.url;
+      const local = toLocal(url);
+      if(local) return _fetch(local, init);
+    }catch(_){}
+    return _fetch(input, init);
+  };
+
+  const _open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url){
+    try{
+      const local = toLocal(url);
+      if(local) arguments[1] = local;
+    }catch(_){}
+    return _open.apply(this, arguments);
+  };
+
+  const _Request = window.Request;
+  window.Request = new Proxy(_Request, {
+    construct(target, args){
+      try{
+        if(args && typeof args[0] === 'string'){
+          const local = toLocal(args[0]);
+          if(local) args[0] = local;
+        }
+      }catch(_){}
+      return new target(...args);
+    }
+  });
+})();
+</script>
+
 <style>
   :root{--bg:#0b0b0c;--panel:#111112;--panel2:#1c1c1e;--text:#e9e9ea;--muted:#a0a0a3;--accent:#ff9900;--accent2:#ff0066;--blue:#1d9bf0}
   *{box-sizing:border-box} html,body{height:100%}
@@ -21,7 +62,7 @@
   .nav a{color:#ddd;font-weight:700;text-transform:uppercase}
   .nav a:hover{color:#fff}
   .search{margin-left:auto;display:flex;align-items:center;gap:6px}
-  .search input{width:360px;max-width:44vw;background:#0f0f0f;border:1px solid #2a2a2a;color:#e9e9ea;padding:8px 10px;outline:none;font-size:14px;border-radius:0}
+  .search input{width:460px;max-width:50vw;background:#0f0f0f;border:1px solid #2a2a2a;color:#e9e9ea;padding:8px 10px;outline:none;font-size:14px;border-radius:0}
   .btn{background:#222;border:1px solid #313131;color:#fff;padding:8px 12px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;border-radius:0}
   .btn:hover{border-color:#444}
   .btn.accent{background:var(--accent);border-color:var(--accent);color:#000}
@@ -61,7 +102,7 @@
   <div class="topbar">
     <div class="logo">
       <div class="lhs">PORN</div><div class="rhs">HUB</div>
-      <small>Pulse Orion Network — Orion Peep Show</small>
+      <small>Pulse Orion Network • Orion Peep Show</small>
     </div>
     <nav class="nav">
       <a href="#" onclick="return false">TRENDING</a>
@@ -77,12 +118,9 @@
   </div>
   <div class="subbar">
     <div class="wrap" style="gap:14px;flex-wrap:wrap">
-      <span>API base</span>
-      <input id="apiBase" value="https://scan.pulsechain.com/api/v2" style="width:360px;background:#0f0f0f;border:1px solid #2a2a2a;color:#e9e9ea;padding:6px 8px;border-radius:0">
-      <button class="btn" id="setBase">Set base</button>
       <span>status:</span>
-      <span id="apiStatus" class="muted">waiting</span>
-      <span style="margin-left:auto" class="muted">expected <span class="kbd">/addresses/{hash}</span></span>
+      <span id="apiStatus" class="muted">ready</span>
+      <span style="margin-left:auto" class="muted">proxy /api/explorer/addresses/{hash}</span>
     </div>
   </div>
 </header>
@@ -91,7 +129,7 @@
   <div class="row">
     <section class="panel hero">
       <h1>Live wallets exposed</h1>
-      <div class="banner" id="hint">Paste a wallet or token. We call the explorer, craft an erotic background message based on behavior, and record it server-side to build Trending.</div>
+      <div class="banner" id="hint">Paste a wallet or token. We call the explorer through our proxy, craft an erotic background message based on behavior, and record it server side to build Trending.</div>
       <div id="grid" class="grid"></div>
 
       <h2 style="margin-top:16px">Trending</h2>
@@ -109,8 +147,8 @@
 
     <aside class="panel side">
       <h2>How it works</h2>
-      <p class="muted">1. GET <code>{API_BASE}/addresses/{address_hash}</code></p>
-      <p class="muted">2. Detect if it is wallet or token contract</p>
+      <p class="muted">1. GET <code>/api/explorer/addresses/{hash}</code></p>
+      <p class="muted">2. Detect wallet or token contract</p>
       <p class="muted">3. Build message from balance, tx count, holders, reputation</p>
       <p class="muted">4. Persist with <code>POST /api/record</code> and show in Trending</p>
       <hr style="border:0;border-top:1px solid #222;margin:12px 0">
@@ -122,10 +160,14 @@
 <footer>© PORN • Orion Peep Show • For entertainment only</footer>
 
 <script>
+// registra service worker para interceptar chamadas externas residuais
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
+
 const DEFAULT_USD_RATE = 0.00002;
 const MAX_CARDS = 24;
 const PULSEX_BUY_URL = "https://app.pulsex.com/";
-let API_BASE = document.getElementById('apiBase').value;
 
 const addrInput = document.getElementById('addrInput');
 const analyzeBtn = document.getElementById('analyzeBtn');
@@ -134,22 +176,19 @@ const apiStatus = document.getElementById('apiStatus');
 const trendWallets = document.getElementById('trendWallets');
 const trendTokens  = document.getElementById('trendTokens');
 
-const shortAddr = (a)=> a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
+const shortAddr = a => a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){ if(x==null) return 0; const n=Number(x); if(!isFinite(n)) return 0; return n>1e12 ? n/1e18 : n; }
-function pickRate(obj, topLevel){ return Number(obj?.exchange_rate)||Number(obj?.token?.exchange_rate)||Number(topLevel?.exchange_rate)||DEFAULT_USD_RATE; }
+function pickRate(obj, top){ return Number(obj?.exchange_rate)||Number(obj?.token?.exchange_rate)||Number(top?.exchange_rate)||DEFAULT_USD_RATE; }
 
-// mensagem erótica baseada em “comportamento”
 function eroticMessage(ctx){
-  const { type, usd, balance, txs, holders, verified, reputation } = ctx;
+  const { type, usd, txs, holders, verified, reputation } = ctx;
   const usdStr = "$"+usd.toLocaleString(undefined,{maximumFractionDigits:2});
-  // Wallet
   if(type==='wallet'){
     const tier = usd>100000 ? "whale" : usd>10000 ? "alpha" : usd>1000 ? "tease" : usd>100 ? "soft" : "bare";
     const act  = txs>500 ? "experienced performer" : txs>100 ? "regular flirt" : "shy lurker";
     const mood = usd<10 ? "broke and brazen" : usd>5000 ? "loaded and shameless" : "curious and reckless";
     return `This wallet goes ${tier}: ${usdStr} on display, ${act}, ${mood}. The window fogs up as it breathes liquidity.`;
   }
-  // Token
   const crowd = holders>50000 ? "packed room screaming for more" : holders>5000 ? "eager audience" : holders>500 ? "intimate crowd" : "private booth";
   const badge = verified ? "verified star" : "masked newcomer";
   const rep   = reputation && reputation!=="ok" ? `with a ${reputation} reputation` : "with clean lights";
@@ -157,14 +196,16 @@ function eroticMessage(ctx){
 }
 
 function composeTitle(address, usd){
-  return `${shortAddr(address)} is showing it all — $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} in liquidity left unlocked.`;
+  return `${shortAddr(address)} is showing it all: $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} in liquidity left unlocked.`;
 }
 
 async function analyze(addr){
-  const url = `${API_BASE.replace(/\/$/,'')}/addresses/${addr}`;
+  // sempre via proxy local
+  const url = `/api/explorer/addresses/${addr}`;
   try{
-    const r = await fetch(url, {headers:{accept:'application/json'}});
-    if(!r.ok){ apiStatus.textContent = "API "+r.status; return; }
+    apiStatus.textContent = "querying";
+    const r = await fetch(url, { headers:{ accept:'application/json' } });
+    if(!r.ok){ apiStatus.textContent = "API " + r.status; return; }
     const data = await r.json();
     const item = Array.isArray(data.items) ? (data.items[0]||{}) : data;
 
@@ -181,13 +222,11 @@ async function analyze(addr){
 
     const type = (isContract && token.symbol) ? "token" : "wallet";
     const symbol = token.symbol || (type==='token' ? 'TOKEN' : 'WPLS');
-    const message = eroticMessage({ type, usd, balance: bal, txs, holders, verified, reputation });
+    const message = eroticMessage({ type, usd, txs, holders, verified, reputation });
     const titleLine = composeTitle(addr, usd);
 
-    // UI card
     addCard({ address: addr, usd, balance: bal, symbol, message, icon: token.icon_url, type });
 
-    // persist
     await fetch("/api/record", {
       method:"POST", headers:{'content-type':'application/json'},
       body: JSON.stringify({ address: addr, type, symbol, usd, balance: bal, titleLine, message })
@@ -196,7 +235,7 @@ async function analyze(addr){
     loadTrending();
     apiStatus.textContent = "OK";
   }catch(e){
-    apiStatus.textContent = e.message||e;
+    apiStatus.textContent = e.message || "error";
   }
 }
 
@@ -244,8 +283,6 @@ function renderList(el, arr){
   }).join("");
 }
 
-// events
-document.getElementById('setBase').onclick = ()=>{ API_BASE = document.getElementById('apiBase').value.trim(); apiStatus.textContent = "base set"; };
 document.getElementById('buyBtn').onclick = ()=> window.open(PULSEX_BUY_URL,"_blank");
 document.getElementById('analyzeBtn').onclick = ()=>{
   const a = addrInput.value.trim();
@@ -258,7 +295,6 @@ document.getElementById('tweetSite').onclick = ()=>{
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(location.href),'_blank');
 };
 
-// boot
 loadTrending();
 </script>
 </body>
