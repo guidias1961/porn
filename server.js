@@ -1,24 +1,30 @@
-// Orion Peep Show – backend com proxy e persistência
+// Orion Peep Show — backend com proxy anti-CORS e persistência simples em arquivo
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 
-// node-fetch para garantir fetch em qualquer versão de Node
-const fetch = (...args) => import("node-fetch").then(({default: f}) => f(...args));
+// node-fetch (garante fetch no Node CJS)
+const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const PUB = path.join(ROOT, "public");
 const DB_PATH = path.join(ROOT, "db.json");
-const DEFAULT_EXPLORER_BASE = (process.env.EXPLORER_BASE || "https://scan.pulsechain.com/api/v2").replace(/\/$/,"");
 
-// db.json
+// base padrão do explorer. Pode sobrescrever com EXPLORER_BASE no Railway.
+const DEFAULT_EXPLORER_BASE = (process.env.EXPLORER_BASE || "https://scan.pulsechain.com/api/v2").replace(/\/$/, "");
+
+// garante db.json
 if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {} }, null, 2));
 
-function loadDB(){ try { return JSON.parse(fs.readFileSync(DB_PATH,"utf8")); } catch { return { items: {} }; } }
-function saveDB(db){ fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2)); }
+// util DB
+function loadDB() {
+  try { return JSON.parse(fs.readFileSync(DB_PATH, "utf8")); }
+  catch { return { items: {} }; }
+}
+function saveDB(state) { fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2)); }
 let db = loadDB();
 
 app.use(cors());
@@ -28,38 +34,33 @@ app.use(express.static(PUB, { index: "index.html", extensions: ["html"] }));
 // health
 app.get("/healthz", (_req, res) => res.type("text").send("ok"));
 
-// PROXY para explorer evitando CORS
-// GET /api/explorer/addresses/:hash?base=<opcional>
+// Proxy para o explorer. Front deve SEMPRE usar isto para evitar CORS.
 app.get("/api/explorer/addresses/:hash", async (req, res) => {
-  const base = (req.query.base || DEFAULT_EXPLORER_BASE).replace(/\/$/,"");
+  const base = (req.query.base || DEFAULT_EXPLORER_BASE).replace(/\/$/, "");
   const hash = req.params.hash;
-
   const urls = [
     `${base}/addresses/${hash}`,
     `${base}/addresses/${hash}/`
   ];
-
   for (const url of urls) {
     try {
       const r = await fetch(url, {
-        headers: {
-          "accept": "application/json",
-          "user-agent": "porn-orion-peep-show/1.0"
-        },
+        headers: { accept: "application/json", "user-agent": "porn-orion-peep-show/1.0" },
         timeout: 10000
       });
       const text = await r.text();
       res.set("x-proxy-source", url);
       res.status(r.status).type("application/json").send(text);
       return;
-    } catch (e) {
+    } catch (_) {
       // tenta próxima url
     }
   }
   res.status(502).json({ error: "proxy_fetch_failed", base, hash });
 });
 
-// grava análise
+// grava análise para trending
+// body: { address, type: 'wallet'|'token', symbol, usd, balance, titleLine, message }
 app.post("/api/record", (req, res) => {
   const { address, type, symbol, usd, balance, titleLine, message } = req.body || {};
   if (!address || !type) return res.status(400).json({ error: "missing address/type" });
@@ -80,7 +81,7 @@ app.post("/api/record", (req, res) => {
   res.json({ ok: true, item: db.items[k] });
 });
 
-// trending
+// trending simples
 app.get("/api/trending", (req, res) => {
   const limit = Number(req.query.limit || 12);
   const arr = Object.values(db.items);

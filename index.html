@@ -82,7 +82,7 @@
       <button class="btn" id="setBase">Set base</button>
       <span>status:</span>
       <span id="apiStatus" class="muted">ready</span>
-      <span style="margin-left:auto" class="muted">proxy <span class="kbd">/api/explorer/addresses/{hash}</span></span>
+      <span style="margin-left:auto" class="muted">proxy /api/explorer/addresses/{hash}</span>
     </div>
   </div>
 </header>
@@ -158,11 +158,11 @@ function composeTitle(address, usd){
 }
 
 async function analyze(addr){
-  const url = `/api/explorer/addresses/${addr}?base=${encodeURIComponent(API_BASE)}`;
+  const url = `/api/explorer/addresses/${addr}?base=${encodeURIComponent(API_BASE)}`; // proxy anti-CORS
   try{
     apiStatus.textContent = "querying";
     const r = await fetch(url, {headers:{accept:'application/json'}});
-    if(!r.ok){ apiStatus.textContent = "API "+r.status; return; }
+    if(!r.ok){ apiStatus.textContent = "API " + r.status; return; }
     const data = await r.json();
     const item = Array.isArray(data.items) ? (data.items[0]||{}) : data;
 
@@ -242,7 +242,7 @@ function renderList(el, arr){
 
 // eventos
 document.getElementById('setBase').onclick = ()=>{ API_BASE = document.getElementById('apiBase').value.trim(); apiStatus.textContent = "base set"; };
-document.getElementById('buyBtn').onclick = ()=> window.open("https://app.pulsex.com/","_blank");
+document.getElementById('buyBtn').onclick = ()=> window.open(PULSEX_BUY_URL,"_blank");
 document.getElementById('analyzeBtn').onclick = ()=>{
   const a = addrInput.value.trim();
   if(!/^0x[a-fA-F0-9]{40}$/.test(a)){ alert('Paste a valid 0x address'); return; }
