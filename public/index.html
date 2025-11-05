@@ -7,12 +7,13 @@
 <meta name="theme-color" content="#ff9900">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 
-<!-- Patches de rede no topo -->
 <script>
 (function(){
-  const ADDR_RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/addresses\/(0x[a-fA-F0-9]{40})\/?$/i;
-  function toLocal(u){ const m = u && u.match(ADDR_RE); return m ? `/api/explorer/addresses/${m[1]}` : null; }
-
+  const ADDR_RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/(addresses|tokens)\/(0x[a-fA-F0-9]{40})\/?$/i;
+  function toLocal(u){
+    const m = u && u.match(ADDR_RE);
+    return m ? `/api/explorer/addresses/${m[2]}` : null;
+  }
   const _fetch = window.fetch.bind(window);
   window.fetch = function(input, init){
     try{
@@ -22,7 +23,6 @@
     }catch(_){}
     return _fetch(input, init);
   };
-
   const _open = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function(method, url){
     try{
@@ -31,7 +31,6 @@
     }catch(_){}
     return _open.apply(this, arguments);
   };
-
   const _Request = window.Request;
   window.Request = new Proxy(_Request, {
     construct(target, args){
@@ -129,7 +128,7 @@
   <div class="row">
     <section class="panel hero">
       <h1>Live wallets exposed</h1>
-      <div class="banner" id="hint">Paste a wallet or token. We call the explorer through our proxy, craft an erotic background message, and record it to build Trending.</div>
+      <div class="banner" id="hint">Paste a wallet or token. We classify on the server, craft an erotic background message and persist to Trending.</div>
       <div id="grid" class="grid"></div>
 
       <h2 style="margin-top:16px">Trending</h2>
@@ -147,10 +146,10 @@
 
     <aside class="panel side">
       <h2>How it works</h2>
-      <p class="muted">1. GET <code>/api/explorer/addresses/{hash}</code></p>
-      <p class="muted">2. Detect wallet or token contract</p>
-      <p class="muted">3. Build message from balance, tx count, holders, reputation</p>
-      <p class="muted">4. Persist with <code>POST /api/record</code> and show in Trending</p>
+      <p class="muted">1. Server checks tokens and addresses endpoints</p>
+      <p class="muted">2. ABI fallback to detect ERC-20</p>
+      <p class="muted">3. Normalized response with kind wallet or token</p>
+      <p class="muted">4. Persist and build Trending</p>
       <hr style="border:0;border-top:1px solid #222;margin:12px 0">
       <button class="btn twitter" id="tweetSite">Tweet the site</button>
     </aside>
@@ -161,9 +160,7 @@
 
 <script>
 // registra service worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(()=>{});
-}
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
 
 const DEFAULT_USD_RATE = 0.00002;
 const MAX_CARDS = 24;
@@ -195,23 +192,22 @@ function eroticMessage(ctx){
   return `A ${badge} enters the stage for a ${crowd}. Liquidity arches, ${usdStr} teased in view, ${rep}. Will it keep the show or fade the lights?`;
 }
 
-function composeTitle(address, usd){
+function composeTitle(address, usd, type){
+  if(type==='token') return `${shortAddr(address)} put a token on stage. Curtains open.`;
   return `${shortAddr(address)} is showing it all: $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} in liquidity left unlocked.`;
 }
 
 async function analyze(addr){
-  const url = `/api/explorer/addresses/${addr}`; // sempre via proxy local
+  const url = `/api/explorer/addresses/${addr}`;
   try{
     apiStatus.textContent = "querying";
     const r = await fetch(url, { headers:{ accept:'application/json' } });
-    if(!r.ok){
-      apiStatus.textContent = "API " + r.status;
-      return;
-    }
+    if(!r.ok){ apiStatus.textContent = "API " + r.status; return; }
     const data = await r.json();
     const item = Array.isArray(data.items) ? (data.items[0]||{}) : data;
 
-    const isContract = !!item.is_contract;
+    const serverKind = data.kind || (item.is_token ? "token" : (item.is_contract ? "wallet" : "wallet"));
+    const isToken = serverKind === "token";
     const token = item.token || {};
     const txs = Number(item.transactions_count||0);
     const holders = Number(token.holders_count||0);
@@ -220,14 +216,14 @@ async function analyze(addr){
 
     const bal = toFloat(item.coin_balance);
     const rate = pickRate(item, data);
-    const usd = bal * rate;
+    const usd = isToken ? 0 : bal * rate; // token não usa balance de wallet
 
-    const type = (isContract && token.symbol) ? "token" : "wallet";
-    const symbol = token.symbol || (type==='token' ? 'TOKEN' : 'WPLS');
+    const type = isToken ? "token" : "wallet";
+    const symbol = token.symbol || (isToken ? 'TOKEN' : 'WPLS');
     const message = eroticMessage({ type, usd, txs, holders, verified, reputation });
-    const titleLine = composeTitle(addr, usd);
+    const titleLine = composeTitle(addr, usd, type);
 
-    addCard({ address: addr, usd, balance: bal, symbol, message, icon: token.icon_url, type });
+    addCard({ address: addr, usd, balance: bal, symbol, message, icon: token.icon_url, type, holders });
 
     await fetch("/api/record", {
       method:"POST", headers:{'content-type':'application/json'},
@@ -241,14 +237,17 @@ async function analyze(addr){
   }
 }
 
-function addCard({address, usd, balance, symbol, message, icon, type}){
+function addCard({address, usd, balance, symbol, message, icon, type, holders}){
   const card = document.createElement('div');
   card.className = 'card';
+  const metaRight = type==='token'
+    ? `Holders: ${holders.toLocaleString()}`
+    : `Bal: ${balance.toLocaleString(undefined,{maximumFractionDigits:4})} ${symbol}`;
   card.innerHTML = `
     <div class="live">LIVE</div>
     <div class="thumb">${icon ? `<img src="${icon}" alt="token" style="max-height:90%;max-width:90%">` : (type==='token'?'TOKEN':'WALLET')}</div>
-    <div class="titleLine">${composeTitle(address, usd)}</div>
-    <div class="meta"><span>Addr: ${shortAddr(address)}</span><span>Bal: ${balance.toLocaleString(undefined,{maximumFractionDigits:4})} ${symbol}</span></div>
+    <div class="titleLine">${composeTitle(address, usd, type)}</div>
+    <div class="meta"><span>Addr: ${shortAddr(address)}</span><span>${metaRight}</span></div>
     <div class="meta"><span>Type: ${type}</span><span></span></div>
     <div class="banner" style="margin-top:8px">${message}</div>
     <div class="shareRow">
@@ -256,10 +255,9 @@ function addCard({address, usd, balance, symbol, message, icon, type}){
       <a class="btn" target="_blank" href="https://scan.pulsechain.com/address/${address}">Explorer</a>
     </div>`;
   card.querySelector('.btn.twitter').onclick = ()=>{
-    const text = composeTitle(address, usd) + " " + message + " #PulseChain #WPLS #OrionPeepShow";
+    const text = composeTitle(address, usd, type) + " " + message + " #PulseChain #WPLS #OrionPeepShow";
     const u = location.origin + location.pathname + "?addr=" + address;
-    const tw = "https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(u);
-    window.open(tw,'_blank');
+    window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(u),'_blank');
   };
   grid.prepend(card);
   while(grid.children.length>MAX_CARDS) grid.removeChild(grid.lastChild);
@@ -280,7 +278,7 @@ async function loadTrending(){
 function renderList(el, arr){
   if(!arr || !arr.length){ el.innerHTML = `<div class="muted">no data</div>`; return; }
   el.innerHTML = arr.map(it=>{
-    const t = it.titleLine || composeTitle(it.address, it.usd||0);
+    const t = it.titleLine || `${shortAddr(it.address)} checked`;
     return `<div class="li"><span>${shortAddr(it.address)} <span class="muted">(${it.type}${it.symbol?": "+it.symbol:""})</span></span><span>x${it.count}</span></div>
             <div class="muted" style="padding:4px 0">${t}</div>`;
   }).join("");

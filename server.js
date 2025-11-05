@@ -1,4 +1,4 @@
-// Orion Peep Show — backend com proxy anti-CORS, CSP e persistência
+// Orion Peep Show — proxy anti CORS, detecção de token, fallback por ABI, persistência
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
@@ -11,11 +11,11 @@ const ROOT = __dirname;
 const PUB = path.join(ROOT, "public");
 const DB_PATH = path.join(ROOT, "db.json");
 
-// Bases corretas para o Pulse Blockscout
+// Blockscout correto
 const V2_BASE = (process.env.EXPLORER_V2 || "https://api.scan.pulsechain.com/api/v2").replace(/\/$/, "");
 const ES_BASE = (process.env.EXPLORER_ES || "https://api.scan.pulsechain.com/api").replace(/\/$/, "");
 
-// CSP travando conexões externas no front
+// CSP conectando só em self
 app.use((req, res, next) => {
   res.set(
     "Content-Security-Policy",
@@ -30,8 +30,8 @@ app.use((req, res, next) => {
 
 // DB simples
 if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {} }, null, 2));
-function loadDB(){ try{ return JSON.parse(fs.readFileSync(DB_PATH, "utf8")); }catch{ return { items: {} }; } }
-function saveDB(state){ fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2)); }
+const loadDB = () => { try { return JSON.parse(fs.readFileSync(DB_PATH, "utf8")); } catch { return { items: {} }; } };
+const saveDB = (state) => fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2));
 let db = loadDB();
 
 app.use(cors());
@@ -40,65 +40,171 @@ app.use(express.static(PUB, { index: "index.html", extensions: ["html"] }));
 
 app.get("/healthz", (_req, res) => res.type("text").send("ok"));
 
-/**
- * Proxy anti CORS
- * 1 tenta Blockscout v2
- * 2 se 404 ou falha, cai na API estilo Etherscan e normaliza
- */
+// helpers
+async function getJSON(url){
+  const r = await fetch(url, { headers: { accept: "application/json" }, timeout: 10000 });
+  const text = await r.text();
+  let body = null;
+  try { body = JSON.parse(text); } catch { body = null; }
+  return { ok: r.ok, status: r.status, body, text, url };
+}
+function looksErc20Abi(abiStr){
+  try{
+    const abi = JSON.parse(abiStr);
+    if (!Array.isArray(abi)) return false;
+    const names = new Set(abi.filter(x=>x && x.name).map(x=>x.name));
+    return names.has("totalSupply") && names.has("balanceOf") && names.has("transfer");
+  }catch{ return false; }
+}
+function normalizeTokenFromV2(j, hash){
+  // Blockscout v2 tokens payload varia por instância
+  const t = j?.token || j || {};
+  return {
+    kind: "token",
+    exchange_rate: null,
+    items: [{
+      hash,
+      is_contract: true,
+      is_token: true,
+      coin_balance: null,
+      transactions_count: null,
+      token: {
+        symbol: t.symbol || null,
+        name: t.name || null,
+        address_hash: hash,
+        decimals: Number(t.decimals ?? t.decimal ?? 18),
+        holders_count: Number(t.holders_count ?? 0),
+        total_supply: String(t.total_supply ?? t.totalSupply ?? "0"),
+        type: t.type || "ERC-20",
+        icon_url: t.icon_url || t.icon || null,
+        exchange_rate: t.exchange_rate || null,
+        reputation: "ok"
+      },
+      is_verified: !!(t.verified || t.is_verified),
+      reputation: "ok"
+    }]
+  };
+}
+function normalizeWalletFromV2(j, hash){
+  const it = Array.isArray(j?.items) ? (j.items[0] || {}) : (j || {});
+  return {
+    kind: "wallet",
+    exchange_rate: j?.exchange_rate ?? null,
+    items: [{
+      hash,
+      is_contract: !!it.is_contract,
+      is_token: false,
+      coin_balance: String(it.coin_balance ?? "0"),
+      transactions_count: Number(it.transactions_count ?? 0),
+      token: null,
+      is_verified: !!it.is_verified,
+      reputation: it.reputation || "ok"
+    }]
+  };
+}
+function normalizeWalletFromES(balanceWei, isContract, hash){
+  return {
+    kind: isContract ? "wallet" : "wallet",
+    exchange_rate: null,
+    items: [{
+      hash,
+      is_contract: !!isContract,
+      is_token: false,
+      coin_balance: String(balanceWei || "0"),
+      transactions_count: null,
+      token: null,
+      is_verified: null,
+      reputation: "ok"
+    }]
+  };
+}
+function normalizeTokenFromES(hash){
+  return {
+    kind: "token",
+    exchange_rate: null,
+    items: [{
+      hash,
+      is_contract: true,
+      is_token: true,
+      coin_balance: null,
+      transactions_count: null,
+      token: {
+        symbol: null,
+        name: null,
+        address_hash: hash,
+        decimals: 18,
+        holders_count: 0,
+        total_supply: "0",
+        type: "ERC-20",
+        icon_url: null,
+        exchange_rate: null,
+        reputation: "ok"
+      },
+      is_verified: null,
+      reputation: "ok"
+    }]
+  };
+}
+
+// endpoint principal com classificação robusta
 app.get("/api/explorer/addresses/:hash", async (req, res) => {
   const hash = req.params.hash;
 
-  // 1 v2 direto
+  // 1 tenta detectar token via v2 /tokens
   try{
-    const url = `${V2_BASE}/addresses/${hash}`;
-    const r = await fetch(url, { headers: { accept: "application/json" }, timeout: 10000 });
-    const txt = await r.text();
-    res.set("x-proxy-source", url);
-    res.status(r.status).type("application/json").send(txt);
-    if (r.ok) return; // só sai se 200
-    // se 404 ou outro erro, cai no fallback
-  }catch(_){ /* segue para fallback */ }
+    const tok = await getJSON(`${V2_BASE}/tokens/${hash}`);
+    if (tok.ok && tok.body) {
+      const norm = normalizeTokenFromV2(tok.body, hash);
+      res.set("x-proxy-source", tok.url);
+      return res.status(200).json(norm);
+    }
+  }catch{}
 
-  // 2 fallback Etherscan-like balance + is_contract
+  // 2 tenta v2 /addresses como wallet ou contrato simples
+  try{
+    const addr = await getJSON(`${V2_BASE}/addresses/${hash}`);
+    if (addr.ok && addr.body) {
+      const norm = normalizeWalletFromV2(addr.body, hash);
+      // se for contrato, pode ainda ser token não indexado, tenta tokens de novo com trailing slash
+      if (norm.items[0].is_contract) {
+        try{
+          const tok2 = await getJSON(`${V2_BASE}/tokens/${hash}/`);
+          if (tok2.ok && tok2.body) {
+            const normTok = normalizeTokenFromV2(tok2.body, hash);
+            res.set("x-proxy-source", tok2.url);
+            return res.status(200).json(normTok);
+          }
+        }catch{}
+      }
+      res.set("x-proxy-source", addr.url);
+      return res.status(200).json(norm);
+    }
+  }catch{}
+
+  // 3 fallback estilo Etherscan
   try{
     const balUrl = `${ES_BASE}?module=account&action=balance&address=${hash}`;
-    const codeUrl = `${ES_BASE}?module=contract&action=getsourcecode&address=${hash}`;
+    const abiUrl = `${ES_BASE}?module=contract&action=getabi&address=${hash}`;
+    const [balR, abiR] = await Promise.all([ getJSON(balUrl), getJSON(abiUrl) ]);
 
-    const [balR, codeR] = await Promise.all([
-      fetch(balUrl, { headers: { accept: "application/json" }, timeout: 10000 }),
-      fetch(codeUrl, { headers: { accept: "application/json" }, timeout: 10000 })
-    ]);
+    const balanceWei = balR?.body?.result ?? "0";
+    const abiStr = abiR?.body?.result ?? "";
+    const isContract = !!abiStr && abiStr !== "Contract source code not verified";
 
-    const balJ = await balR.json().catch(()=>({}));
-    const codeJ = await codeR.json().catch(()=>({}));
-
-    const balanceWei = balJ?.result || "0";
-    const isContract = Array.isArray(codeJ?.result) && codeJ.result.length > 0 && codeJ.result[0]?.ContractName && codeJ.result[0].ContractName !== "";
-
-    const normalized = {
-      exchange_rate: null,
-      items: [{
-        hash,
-        is_contract: !!isContract,
-        coin_balance: balanceWei,       // wei string
-        transactions_count: null,
-        token: null,
-        is_verified: null,
-        reputation: "ok"
-      }],
-      next_page_params: null,
-      _fallback: "etherscan_compat",
-      _sources: { balance: balUrl, code: codeUrl }
-    };
-
-    res.set("x-proxy-source", "fallback");
-    res.status(200).json(normalized);
+    if (isContract && looksErc20Abi(abiStr)) {
+      const normTok = normalizeTokenFromES(hash);
+      res.set("x-proxy-source", "fallback:abi_erc20");
+      return res.status(200).json(normTok);
+    }
+    const normWal = normalizeWalletFromES(balanceWei, isContract, hash);
+    res.set("x-proxy-source", "fallback:wallet_balance");
+    return res.status(200).json(normWal);
   }catch(e){
-    res.status(502).json({ error: "proxy_fallback_failed", details: String(e) });
+    return res.status(502).json({ error: "proxy_failed_all", details: String(e) });
   }
 });
 
-// Persistência Trending
+// persistência
 app.post("/api/record", (req, res) => {
   const { address, type, symbol, usd, balance, titleLine, message } = req.body || {};
   if (!address || !type) return res.status(400).json({ error: "missing address/type" });
@@ -128,6 +234,5 @@ app.get("/api/trending", (req, res) => {
 });
 
 app.get("/", (_req, res) => res.sendFile(path.join(PUB, "index.html")));
-
 app.listen(PORT, () => console.log("Orion Peep Show on " + PORT));
 
