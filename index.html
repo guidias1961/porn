@@ -77,9 +77,6 @@
   </div>
   <div class="subbar">
     <div class="wrap" style="gap:14px;flex-wrap:wrap">
-      <span>Explorer base</span>
-      <input id="apiBase" value="https://scan.pulsechain.com/api/v2" style="width:420px;background:#0f0f0f;border:1px solid #2a2a2a;color:#e9e9ea;padding:6px 8px;border-radius:0">
-      <button class="btn" id="setBase">Set base</button>
       <span>status:</span>
       <span id="apiStatus" class="muted">ready</span>
       <span style="margin-left:auto" class="muted">proxy /api/explorer/addresses/{hash}</span>
@@ -109,7 +106,7 @@
 
     <aside class="panel side">
       <h2>How it works</h2>
-      <p class="muted">1. GET <code>/api/explorer/addresses/{hash}?base=...</code></p>
+      <p class="muted">1. GET <code>/api/explorer/addresses/{hash}</code></p>
       <p class="muted">2. Detect wallet or token contract</p>
       <p class="muted">3. Build message from balance, tx count, holders, reputation</p>
       <p class="muted">4. Persist with <code>POST /api/record</code> and show in Trending</p>
@@ -125,7 +122,6 @@
 const DEFAULT_USD_RATE = 0.00002;
 const MAX_CARDS = 24;
 const PULSEX_BUY_URL = "https://app.pulsex.com/";
-let API_BASE = document.getElementById('apiBase').value;
 
 const addrInput = document.getElementById('addrInput');
 const analyzeBtn = document.getElementById('analyzeBtn');
@@ -158,7 +154,8 @@ function composeTitle(address, usd){
 }
 
 async function analyze(addr){
-  const url = `/api/explorer/addresses/${addr}?base=${encodeURIComponent(API_BASE)}`; // proxy anti-CORS
+  // PROXY sempre. Nunca chama domínio externo do front.
+  const url = `/api/explorer/addresses/${addr}`;
   try{
     apiStatus.textContent = "querying";
     const r = await fetch(url, {headers:{accept:'application/json'}});
@@ -240,8 +237,6 @@ function renderList(el, arr){
   }).join("");
 }
 
-// eventos
-document.getElementById('setBase').onclick = ()=>{ API_BASE = document.getElementById('apiBase').value.trim(); apiStatus.textContent = "base set"; };
 document.getElementById('buyBtn').onclick = ()=> window.open(PULSEX_BUY_URL,"_blank");
 document.getElementById('analyzeBtn').onclick = ()=>{
   const a = addrInput.value.trim();
@@ -254,7 +249,6 @@ document.getElementById('tweetSite').onclick = ()=>{
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(location.href),'_blank');
 };
 
-// boot
 loadTrending();
 </script>
 </body>

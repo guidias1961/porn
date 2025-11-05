@@ -1,10 +1,8 @@
-// Orion Peep Show — backend com proxy anti-CORS e persistência simples em arquivo
+// Orion Peep Show — backend com proxy anti-CORS, CSP e persistência em arquivo
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
-
-// node-fetch (garante fetch no Node CJS)
 const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
 
 const app = express();
@@ -13,35 +11,40 @@ const ROOT = __dirname;
 const PUB = path.join(ROOT, "public");
 const DB_PATH = path.join(ROOT, "db.json");
 
-// base padrão do explorer. Pode sobrescrever com EXPLORER_BASE no Railway.
+// Explorer padrão (pode ajustar via EXPLORER_BASE se quiser)
 const DEFAULT_EXPLORER_BASE = (process.env.EXPLORER_BASE || "https://scan.pulsechain.com/api/v2").replace(/\/$/, "");
 
-// garante db.json
-if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {} }, null, 2));
+// Segurança: só permite conexões XHR para o próprio domínio
+app.use((req, res, next) => {
+  res.set(
+    "Content-Security-Policy",
+    "default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; " +
+    "img-src 'self' data: https:; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src https://fonts.gstatic.com; " +
+    "connect-src 'self';"
+  );
+  next();
+});
 
-// util DB
-function loadDB() {
-  try { return JSON.parse(fs.readFileSync(DB_PATH, "utf8")); }
-  catch { return { items: {} }; }
-}
-function saveDB(state) { fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2)); }
+// DB simples em arquivo
+if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {} }, null, 2));
+const loadDB = () => { try { return JSON.parse(fs.readFileSync(DB_PATH, "utf8")); } catch { return { items: {} }; } };
+const saveDB = (state) => fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2));
 let db = loadDB();
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(PUB, { index: "index.html", extensions: ["html"] }));
 
-// health
 app.get("/healthz", (_req, res) => res.type("text").send("ok"));
 
-// Proxy para o explorer. Front deve SEMPRE usar isto para evitar CORS.
+// Proxy anti-CORS: o front SEMPRE deve chamar isto
 app.get("/api/explorer/addresses/:hash", async (req, res) => {
   const base = (req.query.base || DEFAULT_EXPLORER_BASE).replace(/\/$/, "");
   const hash = req.params.hash;
-  const urls = [
-    `${base}/addresses/${hash}`,
-    `${base}/addresses/${hash}/`
-  ];
+  const urls = [`${base}/addresses/${hash}`, `${base}/addresses/${hash}/`];
+
   for (const url of urls) {
     try {
       const r = await fetch(url, {
@@ -52,15 +55,12 @@ app.get("/api/explorer/addresses/:hash", async (req, res) => {
       res.set("x-proxy-source", url);
       res.status(r.status).type("application/json").send(text);
       return;
-    } catch (_) {
-      // tenta próxima url
-    }
+    } catch (_) { /* tenta próxima variação */ }
   }
   res.status(502).json({ error: "proxy_fetch_failed", base, hash });
 });
 
-// grava análise para trending
-// body: { address, type: 'wallet'|'token', symbol, usd, balance, titleLine, message }
+// Persistência para o Trending
 app.post("/api/record", (req, res) => {
   const { address, type, symbol, usd, balance, titleLine, message } = req.body || {};
   if (!address || !type) return res.status(400).json({ error: "missing address/type" });
@@ -81,7 +81,6 @@ app.post("/api/record", (req, res) => {
   res.json({ ok: true, item: db.items[k] });
 });
 
-// trending simples
 app.get("/api/trending", (req, res) => {
   const limit = Number(req.query.limit || 12);
   const arr = Object.values(db.items);
@@ -90,7 +89,6 @@ app.get("/api/trending", (req, res) => {
   res.json({ wallets, tokens, total: arr.length, updatedAt: Date.now() });
 });
 
-// raiz explícita
 app.get("/", (_req, res) => res.sendFile(path.join(PUB, "index.html")));
 
 app.listen(PORT, () => console.log("Orion Peep Show on " + PORT));
