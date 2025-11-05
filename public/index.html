@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>PORN – Orion Peep Show</title>
+<title>PORN – Pulse Orion Network</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#ff9900">
 <link rel="icon" href="/logo.png" type="image/png">
 <link rel="apple-touch-icon" href="/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 
-<!-- Proxy para evitar chamadas diretas ao scan no client -->
 <script>
 (function(){
   const RE = /^https?:\/\/scan\.pulsechain\.com\/api\/v2\/(addresses|tokens)\/(0x[a-fA-F0-9]{40})\/?$/i;
@@ -55,7 +54,6 @@
   .logoText{display:flex;align-items:baseline;gap:6px;font-family:'Bebas Neue',sans-serif;letter-spacing:.5px}
   .logoText .lhs{background:#000;color:#fff;padding:6px 10px;font-size:30px;line-height:1;border:2px solid #fff}
   .logoText .rhs{background:var(--accent);color:#000;padding:6px 10px;font-size:30px;line-height:1;font-weight:900}
-  .logoText small{display:block;font:600 11px/1 'Open Sans',sans-serif;color:#bbb;margin-left:4px;margin-top:2px}
   .nav{display:flex;gap:16px;margin-left:8px;flex-wrap:wrap}
   .nav a{color:#ddd;font-weight:700;text-transform:uppercase}
   .nav a:hover{color:#fff}
@@ -91,8 +89,9 @@
   footer{padding:20px;color:#999;text-align:center}
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .list{background:#0e0e0f;border:1px solid #222;padding:8px}
-  .li{display:flex;justify-content:space-between;border-top:1px solid #222;padding:6px 0}
+  .li{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #222;padding:6px 0;gap:8px}
   .li:first-child{border-top:0}
+  .li .right{display:flex;gap:6px;align-items:center}
 </style>
 </head>
 <body>
@@ -120,7 +119,7 @@
   <div class="subbar">
     <div class="wrap" style="gap:14px;flex-wrap:wrap">
       <span id="apiStatus" class="muted">ready to peep</span>
-      <span style="margin-left:auto" class="muted">all peeks are on-chain</span>
+      <span style="margin-left:auto" class="muted">Pulse Orion Network</span>
     </div>
   </div>
 </header>
@@ -156,10 +155,9 @@
   </div>
 </main>
 
-<footer>© PORN • Orion Peep Show • entertainment only</footer>
+<footer>© PORN • Pulse Orion Network • entertainment only</footer>
 
 <script>
-// SW
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
 
 let WPLS_USD = 0.00002;
@@ -176,10 +174,7 @@ const trendWallets= document.getElementById('trendWallets');
 const trendTokens = document.getElementById('trendTokens');
 
 document.getElementById('buyBtn').onclick   = ()=> window.open(PULSEX_BUY_URL,"_blank");
-document.getElementById('closeBtn').onclick = ()=>{
-  addrInput.value = "";
-  grid.innerHTML = "";
-};
+document.getElementById('closeBtn').onclick = ()=>{ addrInput.value = ""; grid.innerHTML = ""; };
 
 const shortAddr = a => a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){ if(x==null) return 0; const n=Number(x); if(!isFinite(n)) return 0; return n>1e12 ? n/1e18 : n; }
@@ -209,7 +204,6 @@ function titleFor({address, usd, type, name, symbol}){
   return `${shortAddr(address)} is showing it all. $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} waving at the glass.`;
 }
 
-// Escolha da mídia por regras solicitadas
 function pickMedia({ type, usd, market }){
   if(type === 'token'){
     const mc = Number(market?.market_cap_usd || 0);
@@ -228,7 +222,6 @@ function addCard({address, usd, balance, symbol, name, message, icon, type, hold
   const card = document.createElement('div');
   card.className = 'card';
 
-  // right meta
   let right = "";
   if(type==='token'){
     const parts = [];
@@ -248,11 +241,8 @@ function addCard({address, usd, balance, symbol, name, message, icon, type, hold
   const media = pickMedia({ type, usd, market });
   let thumbHTML = "";
   if (media){
-    if (media.kind === 'video'){
-      thumbHTML = `<video src="${media.src}" muted playsinline autoplay loop></video>`;
-    } else {
-      thumbHTML = `<img src="${media.src}" alt="">`;
-    }
+    if (media.kind === 'video'){ thumbHTML = `<video src="${media.src}" muted playsinline autoplay loop></video>`; }
+    else { thumbHTML = `<img src="${media.src}" alt="">`; }
   } else if (icon && type==='token'){
     thumbHTML = `<img src="${icon}" alt="token">`;
   } else {
@@ -273,7 +263,7 @@ function addCard({address, usd, balance, symbol, name, message, icon, type, hold
       <a class="btn" target="_blank" href="https://scan.pulsechain.com/address/${address}">Explorer</a>
     </div>`;
   card.querySelector('.btn.twitter').onclick = ()=>{
-    const text = titleFor({ address, usd, type, name, symbol }) + " " + message + " #PulseChain #WPLS #OrionPeepShow";
+    const text = titleFor({ address, usd, type, name, symbol }) + " " + message + " #PulseChain #WPLS #PulseOrionNetwork";
     const u = location.origin + location.pathname + "?addr=" + address;
     window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(u),'_blank');
   };
@@ -359,7 +349,17 @@ async function loadFeed(){
 function renderList(el, arr){
   if(!arr || !arr.length){ el.innerHTML = `<div class="muted">no data</div>`; return; }
   el.innerHTML = arr.map(it=>{
-    return `<div class="li"><span>${shortAddr(it.address)} <span class="muted">(${it.type}${it.symbol?": "+it.symbol:""})</span></span><span>x${it.count}</span></div>`;
+    const url = it.type === 'token'
+      ? `https://scan.pulsechain.com/token/${it.address}`
+      : `https://scan.pulsechain.com/address/${it.address}`;
+    return `
+      <div class="li">
+        <span>${shortAddr(it.address)} <span class="muted">(${it.type}${it.symbol?": "+it.symbol:""})</span></span>
+        <span class="right">
+          <span>x${it.count}</span>
+          <a class="btn" target="_blank" href="${url}">Explorer</a>
+        </span>
+      </div>`;
   }).join("");
 }
 
@@ -370,7 +370,7 @@ document.getElementById('analyzeBtn').onclick = ()=>{
 };
 addrInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter') document.getElementById('analyzeBtn').click(); });
 document.getElementById('tweetSite').onclick = ()=>{
-  const text = "Peeping wallets at PORN. Bring your 0x. #PulseChain #WPLS";
+  const text = "Peeping wallets at PORN. Bring your 0x. #PulseChain #WPLS #PulseOrionNetwork";
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(location.href),'_blank');
 };
 

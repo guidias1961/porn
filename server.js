@@ -1,5 +1,5 @@
-// Orion Peep Show — proxy anti-CORS, classificação wallet/token, preço WPLS, Dexscreener,
-// persistência de Trending + Feed, CSP liberando mídia local (png/mp4)
+// Pulse Orion Network — proxy anti-CORS, classificação wallet/token, preço WPLS,
+// Dexscreener, persistência de Trending + Feed, CSP para mídia local
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
@@ -15,7 +15,6 @@ const DB_PATH = path.join(ROOT, "db.json");
 const V2_BASE = (process.env.EXPLORER_V2 || "https://api.scan.pulsechain.com/api/v2").replace(/\/$/, "");
 const ES_BASE = (process.env.EXPLORER_ES || "https://api.scan.pulsechain.com/api").replace(/\/$/, "");
 
-// CSP inclui media-src para vídeos/imagens locais
 app.use((req, res, next) => {
   res.set(
     "Content-Security-Policy",
@@ -29,7 +28,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// DB
 if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ items: {}, feed: [] }, null, 2));
 const loadDB = () => {
   try {
@@ -48,7 +46,6 @@ app.use(express.static(PUB, { index: "index.html", extensions: ["html"] }));
 
 app.get("/healthz", (_req, res) => res.type("text").send("ok"));
 
-// utils
 async function getJSON(url){
   const r = await fetch(url, { headers: { accept: "application/json" }, timeout: 12000 });
   const text = await r.text();
@@ -155,7 +152,6 @@ function normalizeTokenFromES(hash, name, symbol){
   };
 }
 
-// Dexscreener
 function pickBestPair(pairs){
   if(!Array.isArray(pairs) || !pairs.length) return null;
   const pulsePairs = pairs.filter(p => (p.chainId||"").toLowerCase().includes("pulse"));
@@ -189,7 +185,6 @@ async function enrichWithDexscreener(norm, addr){
   return norm;
 }
 
-// preço WPLS
 let priceCache = { val: null, ts: 0, src: "fallback" };
 async function fetchWplsPrice(){
   if (process.env.WPLS_PRICE_USD) {
@@ -214,10 +209,8 @@ app.get("/api/price", async (_req, res) => {
   res.json({ wplsUsd: price, from: src, cached: false });
 });
 
-// classificação + enrich
 app.get("/api/explorer/addresses/:hash", async (req, res) => {
   const hash = req.params.hash;
-
   try{
     const tok = await getJSON(`${V2_BASE}/tokens/${hash}`);
     if (tok.ok && tok.body) {
@@ -227,7 +220,6 @@ app.get("/api/explorer/addresses/:hash", async (req, res) => {
       return res.status(200).json(norm);
     }
   }catch{}
-
   try{
     const addr = await getJSON(`${V2_BASE}/addresses/${hash}`);
     if (addr.ok && addr.body) {
@@ -247,7 +239,6 @@ app.get("/api/explorer/addresses/:hash", async (req, res) => {
       return res.status(200).json(norm);
     }
   }catch{}
-
   try{
     const balUrl = `${ES_BASE}?module=account&action=balance&address=${hash}`;
     const abiUrl = `${ES_BASE}?module=contract&action=getabi&address=${hash}`;
@@ -275,7 +266,6 @@ app.get("/api/explorer/addresses/:hash", async (req, res) => {
   }
 });
 
-// persistência (Trending + Feed)
 const FEED_MAX = 200;
 app.post("/api/record", (req, res) => {
   const { address, type, symbol, name, usd, balance, titleLine, message, icon, holders, market } = req.body || {};
@@ -284,8 +274,7 @@ app.post("/api/record", (req, res) => {
   const k = String(address).toLowerCase();
   const prev = db.items[k] || { count: 0 };
   db.items[k] = {
-    address: k,
-    type,
+    address: k, type,
     symbol: symbol || prev.symbol || null,
     usd: typeof usd === "number" ? usd : prev.usd || 0,
     balance: typeof balance === "number" ? balance : prev.balance || 0,
@@ -298,16 +287,12 @@ app.post("/api/record", (req, res) => {
   db.feed = db.feed.filter(x => x.address !== k);
   db.feed.unshift({
     ts: Date.now(),
-    address: k,
-    type,
-    symbol: symbol || null,
-    name: name || null,
+    address: k, type,
+    symbol: symbol || null, name: name || null,
     usd: typeof usd === "number" ? usd : 0,
     balance: typeof balance === "number" ? balance : 0,
-    titleLine: titleLine || "",
-    message: message || "",
-    icon: icon || null,
-    holders: typeof holders === "number" ? holders : null,
+    titleLine: titleLine || "", message: message || "",
+    icon: icon || null, holders: typeof holders === "number" ? holders : null,
     market: market || null
   });
   if (db.feed.length > FEED_MAX) db.feed.length = FEED_MAX;
@@ -330,5 +315,5 @@ app.get("/api/trending", (req, res) => {
 });
 
 app.get("/", (_req, res) => res.sendFile(path.join(PUB, "index.html")));
-app.listen(PORT, () => console.log("Orion Peep Show on " + PORT));
+app.listen(PORT, () => console.log("Pulse Orion Network on " + PORT));
 
