@@ -103,12 +103,15 @@
         <div class="lhs">PORN</div><div class="rhs">HUB</div>
       </div>
     </div>
-  
+ 
     <div class="search">
       <input id="addrInput" placeholder="Drop a 0x and get undressed">
       <button class="btn accent" id="analyzeBtn">Analyze</button>
       <button class="btn green" id="buyBtn">buy</button>
-      <button class="btn danger" id="closeBtn">X</button>
+      <!-- X agora é share no Twitter -->
+      <a class="btn twitter" id="xBtn" href="https://x.com/SEU_HANDLE" target="_blank" rel="noopener">X</a>
+
+
     </div>
   </div>
   <div class="subbar">
@@ -169,7 +172,7 @@ const trendWallets= document.getElementById('trendWallets');
 const trendTokens = document.getElementById('trendTokens');
 
 document.getElementById('buyBtn').onclick   = ()=> window.open(PULSEX_BUY_URL,"_blank");
-document.getElementById('closeBtn').onclick = ()=>{ addrInput.value = ""; grid.innerHTML = ""; };
+
 
 const shortAddr = a => a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){ if(x==null) return 0; const n=Number(x); if(!isFinite(n)) return 0; return n>1e12 ? n/1e18 : n; }

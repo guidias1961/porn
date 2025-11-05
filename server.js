@@ -12,8 +12,9 @@ const ROOT = __dirname;
 const PUB = path.join(ROOT, "public");
 const DB_PATH = path.join(ROOT, "db.json");
 
+// Preferir os domínios com /api na origem para evitar redirects
 const V2_BASE = (process.env.EXPLORER_V2 || "https://api.scan.pulsechain.com/api/v2").replace(/\/$/, "");
-const ES_BASE = (process.env.EXPLORER_ES || "https://api.scan.pulsechain.com/api").replace(/\/$/, "");
+const ES_BASE  = (process.env.EXPLORER_ES || "https://api.scan.pulsechain.com/api").replace(/\/$/, "");
 
 app.use((req, res, next) => {
   res.set(
