@@ -5,106 +5,57 @@
 <title>PORN – Orion Peep Show</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#ff9900">
-<!-- Tipografia parecida com Pornhub: Bebas Neue (titles) + Open Sans (UI) -->
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0b0b0c;
-    --panel:#111112;
-    --panel2:#1c1c1e;
-    --text:#e9e9ea;
-    --muted:#a0a0a3;
-    --accent:#ff9900;
-    --accent2:#ff0066;
-    --link:#5aa9ff;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0;background:var(--bg);color:var(--text);
-    font-family:'Open Sans', Arial, sans-serif; font-size:14px; line-height:1.45;
-  }
+  :root{--bg:#0b0b0c;--panel:#111112;--panel2:#1c1c1e;--text:#e9e9ea;--muted:#a0a0a3;--accent:#ff9900;--accent2:#ff0066;--link:#5aa9ff}
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.45}
   a{color:var(--link);text-decoration:none}
-  /* HEADER estilo pornhub */
-  header{
-    background:#000; border-bottom:2px solid #1a1a1a; color:#fff;
-  }
-  .topbar{
-    max-width:1280px; margin:0 auto; display:flex; align-items:center; gap:18px; padding:10px 16px;
-  }
-  .logo{display:flex; align-items:baseline; gap:6px; font-family:'Bebas Neue', sans-serif; letter-spacing:.5px}
-  .logo .lhs{background:#000; color:#fff; padding:6px 10px; font-size:30px; line-height:1; border:2px solid #fff}
-  .logo .rhs{background:var(--accent); color:#000; padding:6px 10px; font-size:30px; line-height:1; font-weight:900}
-  .logo small{display:block; font:600 11px/1 'Open Sans',sans-serif; color:#bbb; margin-left:4px; margin-top:2px}
-  .nav{
-    display:flex; gap:16px; margin-left:8px; flex-wrap:wrap;
-  }
-  .nav a{color:#ddd; font-weight:700; text-transform:uppercase}
+  header{background:#000;border-bottom:2px solid #1a1a1a;color:#fff}
+  .topbar{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:10px 16px}
+  .logo{display:flex;align-items:baseline;gap:6px;font-family:'Bebas Neue',sans-serif;letter-spacing:.5px}
+  .logo .lhs{background:#000;color:#fff;padding:6px 10px;font-size:30px;line-height:1;border:2px solid #fff}
+  .logo .rhs{background:var(--accent);color:#000;padding:6px 10px;font-size:30px;line-height:1;font-weight:900}
+  .logo small{display:block;font:600 11px/1 'Open Sans',sans-serif;color:#bbb;margin-left:4px;margin-top:2px}
+  .nav{display:flex;gap:16px;margin-left:8px;flex-wrap:wrap}
+  .nav a{color:#ddd;font-weight:700;text-transform:uppercase}
   .nav a:hover{color:#fff}
-  .search{
-    margin-left:auto; display:flex; align-items:center; gap:6px;
-  }
-  .search input{
-    width:340px; max-width:44vw; background:#0f0f0f; border:1px solid #2a2a2a; color:#e9e9ea; padding:8px 10px; outline:none;
-    font-size:14px; border-radius:0; /* sem cantos arredondados */
-  }
-  .btn{
-    background:#222; border:1px solid #313131; color:#fff; padding:8px 12px; font-weight:700; cursor:pointer; text-transform:uppercase;
-    letter-spacing:.3px; border-radius:0;
-  }
+  .search{margin-left:auto;display:flex;align-items:center;gap:6px}
+  .search input{width:360px;max-width:44vw;background:#0f0f0f;border:1px solid #2a2a2a;color:#e9e9ea;padding:8px 10px;outline:none;font-size:14px;border-radius:0}
+  .btn{background:#222;border:1px solid #313131;color:#fff;padding:8px 12px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;border-radius:0}
   .btn:hover{border-color:#444}
-  .btn.accent{background:var(--accent); border-color:var(--accent); color:#000}
-  .btn.green{background:#0f8c36; border-color:#0f8c36}
-  .btn.twitter{background:#1d9bf0; border-color:#1d9bf0}
-  .subbar{
-    border-top:1px solid #1a1a1a; background:#0a0a0a;
-  }
-  .subbar .wrap{
-    max-width:1280px; margin:0 auto; padding:8px 16px; display:flex; align-items:center; gap:10px; color:#bbb;
-  }
-  .wrap a{color:#bbb}
-  /* MAIN */
-  main{max-width:1280px; margin:0 auto; padding:16px}
-  .row{display:flex; gap:16px; align-items:flex-start}
-  .panel{
-    background:var(--panel); border:1px solid #222; padding:12px; color:#ddd;
-  }
+  .btn.accent{background:var(--accent);border-color:var(--accent);color:#000}
+  .btn.green{background:#0f8c36;border-color:#0f8c36}
+  .btn.twitter{background:#1d9bf0;border-color:#1d9bf0}
+  .subbar{border-top:1px solid #1a1a1a;background:#0a0a0a}
+  .subbar .wrap{max-width:1280px;margin:0 auto;padding:8px 16px;display:flex;align-items:center;gap:10px;color:#bbb}
+  main{max-width:1280px;margin:0 auto;padding:16px}
+  .row{display:flex;gap:16px;align-items:flex-start}
+  .panel{background:var(--panel);border:1px solid #222;padding:12px;color:#ddd}
   .hero{flex:1}
   .side{width:320px}
-  h1,h2{font-family:'Bebas Neue', sans-serif; margin:0 0 6px; letter-spacing:.3px}
-  h1{font-size:34px}
-  h2{font-size:22px}
+  h1,h2{font-family:'Bebas Neue',sans-serif;margin:0 0 6px;letter-spacing:.3px}
+  h1{font-size:34px} h2{font-size:22px}
   .muted{color:var(--muted)}
-  .banner{
-    background:#0a0a0a; border:1px dashed #2e2e2e; color:#f7d083; padding:8px 10px;
-  }
-  /* GRID estilo thumbs pornhub (retangular, sem bordas arredondadas) */
-  .grid{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:12px}
-  @media (max-width:1100px){ .grid{grid-template-columns:repeat(3,1fr)} }
-  @media (max-width:820px){ .grid{grid-template-columns:repeat(2,1fr)} .side{display:none} }
-  .card{
-    background:var(--panel2); border:1px solid #2a2a2a; padding:8px; position:relative;
-  }
-  .thumb{
-    background:#070707; border:1px solid #222; height:150px; display:flex; align-items:center; justify-content:center; color:#666; font-weight:700;
-  }
-  .titleLine{margin-top:8px; font-weight:700; color:#fff}
-  .meta{display:flex; justify-content:space-between; color:#a8a8ab; font-size:12px; margin-top:4px}
-  .shareRow{display:flex; gap:6px; margin-top:8px}
-  .live{
-    position:absolute; top:8px; left:8px; background:var(--accent2); color:#fff; font-weight:900; padding:2px 6px; font-size:11px;
-  }
+  .banner{background:#0a0a0a;border:1px dashed #2e2e2e;color:#f7d083;padding:8px 10px}
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
+  @media (max-width:1100px){.grid{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:820px){.grid{grid-template-columns:repeat(2,1fr)} .side{display:none}}
+  .card{background:var(--panel2);border:1px solid #2a2a2a;padding:8px;position:relative}
+  .thumb{background:#070707;border:1px solid #222;height:150px;display:flex;align-items:center;justify-content:center;color:#666;font-weight:700}
+  .titleLine{margin-top:8px;font-weight:700;color:#fff}
+  .meta{display:flex;justify-content:space-between;color:#a8a8ab;font-size:12px;margin-top:4px}
+  .shareRow{display:flex;gap:6px;margin-top:8px}
+  .live{position:absolute;top:8px;left:8px;background:var(--accent2);color:#fff;font-weight:900;padding:2px 6px;font-size:11px}
   .error{color:#ffb3b3}
-  /* FOOTER */
-  footer{padding:20px; color:#999; text-align:center}
+  footer{padding:20px;color:#999;text-align:center}
 </style>
 </head>
 <body>
 <header>
   <div class="topbar">
     <div class="logo">
-      <div class="lhs">PORN</div>
-      <div class="rhs">HUB</div>
+      <div class="lhs">PORN</div><div class="rhs">HUB</div>
       <small>Pulse Orion Network — Orion Peep Show</small>
     </div>
     <nav class="nav">
@@ -114,7 +65,7 @@
       <a href="#" onclick="return false">Exposed</a>
     </nav>
     <div class="search">
-      <input id="addrInput" placeholder="Paste a wallet 0x... and press Analyze">
+      <input id="addrInput" placeholder="Paste a wallet 0x... then Analyze">
       <button class="btn accent" id="analyzeBtn">Analyze</button>
       <button class="btn green" id="buyBtn">$PORN Buy</button>
     </div>
@@ -122,8 +73,8 @@
   <div class="subbar">
     <div class="wrap">
       <span>API status:</span>
-      <span id="apiStatus" class="muted">not checked</span>
-      <span style="margin-left:auto">Share your exposures with <b>#PulseChain</b> • <b>#WPLS</b></span>
+      <span id="apiStatus" class="muted">probing…</span>
+      <span style="margin-left:auto">Share with <b>#PulseChain</b> <b>#WPLS</b></span>
     </div>
   </div>
 </header>
@@ -137,30 +88,32 @@
     </section>
     <aside class="panel side">
       <h2>How it works</h2>
-      <p class="muted">We call the explorer API for <code>/addresses/{address_hash}</code>. From the response we extract coin balance and exchange rate to estimate USD. Then we generate a meme line:</p>
+      <p class="muted">We call the explorer REST endpoint for an address. From the JSON we read <b>coin_balance</b> and <b>exchange_rate</b> to estimate USD, then print a meme line.</p>
       <p class="banner">“0x8a3... is showing it all — $431 in liquidity left unlocked.”</p>
-      <p class="muted">Everything is client-side. No accounts. No storage. Pure exhibitionism.</p>
-      <hr style="border:0;border-top:1px solid #222; margin:12px 0">
+      <hr style="border:0;border-top:1px solid #222;margin:12px 0">
       <button class="btn twitter" id="tweetSite">Tweet the site</button>
     </aside>
   </div>
 </main>
 
-<footer>
-  © PORN • Orion Peep Show • For entertainment only • Not financial advice
-</footer>
+<footer>© PORN • Orion Peep Show • For entertainment only</footer>
 
 <script>
-/* ========================= CONFIG ========================= */
-const API_BASE = "https://scan.mypinata.cloud/ipfs/bafybeih3olry3is4e4zm7russ5lh3erzphcal5a7ayflkhzm5ojviro2cp4/4"; 
-// ↑ ajuste para o seu host/base. Endpoint esperado: `${API_BASE}/addresses/${addressHash}`
-// Ex.: https://<host>/addresses/0xABC...
-
+/* ===== CONFIG ===== */
+const API_BASE = "https://scan.mypinata.cloud/ipfs/bafybeih3olry3is4e4zm7russ5lh3erzphcal5a7ayflkhzm5ojviro2cp4/4"; // base do seu print
+const CANDIDATES = [
+  (addr)=>`${API_BASE}/api/v2/addresses/${addr}`,
+  (addr)=>`${API_BASE}/addresses/${addr}`,
+  (addr)=>`${API_BASE}/address/${addr}`,
+  // fallback para gateways que exigem barra final
+  (addr)=>`${API_BASE}/api/v2/addresses/${addr}/`,
+  (addr)=>`${API_BASE}/addresses/${addr}/`
+];
 const PULSEX_BUY_URL = "https://app.pulsex.com/";
-const DEFAULT_USD_RATE = 0.00002; // fallback se a API não trouxer exchange_rate
+const DEFAULT_USD_RATE = 0.00002;
 const MAX_CARDS = 24;
 
-/* ========================= UI HOOKS ====================== */
+/* ===== UI ===== */
 const addrInput = document.getElementById('addrInput');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const grid = document.getElementById('grid');
@@ -168,117 +121,113 @@ const apiStatus = document.getElementById('apiStatus');
 const tweetSite = document.getElementById('tweetSite');
 const buyBtn = document.getElementById('buyBtn');
 
-/* ========================= HELPERS ======================= */
-function shortAddr(a){ return a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown"; }
+const shortAddr = (a)=> a ? (a.slice(0,6)+"..."+a.slice(-4)) : "unknown";
 function toFloat(x){
   if(x==null) return 0;
-  let n = Number(x);
-  if(!isFinite(n) || n===0) return 0;
-  // heurística: se parecer wei grande, dividir por 1e18
-  if(n>1e12) return n/1e18;
-  return n;
+  const n = Number(x);
+  if(!isFinite(n)) return 0;
+  return n>1e12 ? n/1e18 : n; // heurística wei→unit
 }
-function pickRate(obj){
-  // tenta pegar em ordem: item.exchange_rate → token.exchange_rate → top-level exchange_rate → fallback
-  return Number(obj?.exchange_rate) || Number(obj?.token?.exchange_rate) || Number(obj?.top_exchange_rate) || DEFAULT_USD_RATE;
-}
-function ts(){ return new Date().toLocaleTimeString(); }
-
-/* ========================= CORE ========================== */
-async function fetchAddressInfo(address){
-  // tenta GET /addresses/{address_hash}
-  const url = `${API_BASE}/addresses/${address}`;
-  const r = await fetch(url, {headers:{'accept':'application/json'}});
-  if(!r.ok) throw new Error(`API ${r.status}`);
-  return await r.json();
+function pickRate(obj, topLevel){
+  return Number(obj?.exchange_rate) || Number(obj?.token?.exchange_rate) || Number(topLevel?.exchange_rate) || DEFAULT_USD_RATE;
 }
 function composeLine(address, usd){
   return `${shortAddr(address)} is showing it all — $${usd.toLocaleString(undefined,{maximumFractionDigits:2})} in liquidity left unlocked.`;
 }
+
+/* ===== endpoint discovery ===== */
+let resolved = null;
+async function probeEndpoint(addr){
+  // já resolvido
+  if(resolved) return resolved;
+  for(const make of CANDIDATES){
+    const url = make(addr);
+    try{
+      const r = await fetch(url, {headers:{accept:'application/json'}});
+      if(!r.ok) continue;
+      const j = await r.json();
+      if(j && Array.isArray(j.items) && j.items.length){
+        resolved = make; // guarda o gerador de URL
+        apiStatus.textContent = `OK ${url}`;
+        return resolved;
+      }
+    }catch(_){}
+  }
+  apiStatus.innerHTML = `<span class="error">no route responded 200</span>`;
+  return null;
+}
+
+/* ===== render ===== */
 function addCard({address, usd, balance, icon, tokenSymbol, holders, reputation}){
   const card = document.createElement('div');
   card.className = 'card';
   card.innerHTML = `
     <div class="live">LIVE</div>
-    <div class="thumb">
-      ${icon ? `<img src="${icon}" alt="token" style="max-height:90%;max-width:90%">` : 'WALLET'}
-    </div>
+    <div class="thumb">${icon ? `<img src="${icon}" alt="token" style="max-height:90%;max-width:90%">` : 'WALLET'}</div>
     <div class="titleLine">${composeLine(address, usd)}</div>
-    <div class="meta">
-      <span>Addr: ${shortAddr(address)}</span>
-      <span>Bal: ${balance.toLocaleString(undefined,{maximumFractionDigits:4})} ${tokenSymbol||'WPLS'}</span>
-    </div>
-    <div class="meta">
-      <span>Reputation: ${reputation||'unknown'}</span>
-      <span>Holders: ${holders?Number(holders).toLocaleString(): '—'}</span>
-    </div>
+    <div class="meta"><span>Addr: ${shortAddr(address)}</span><span>Bal: ${balance.toLocaleString(undefined,{maximumFractionDigits:4})} ${tokenSymbol||'WPLS'}</span></div>
+    <div class="meta"><span>Reputation: ${reputation||'unknown'}</span><span>Holders: ${holders?Number(holders).toLocaleString(): '—'}</span></div>
     <div class="shareRow">
       <button class="btn twitter">Share</button>
       <a class="btn" target="_blank" href="https://scan.pulsechain.com/address/${address}">Explorer</a>
-    </div>
-  `;
-  // bind share
+    </div>`;
   card.querySelector('.btn.twitter').onclick = ()=>{
     const text = composeLine(address, usd) + " #PulseChain #WPLS #OrionPeepShow";
     const url = "https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(location.href+"?addr="+address);
     window.open(url,'_blank');
   };
   grid.prepend(card);
-  // limita número de cards
   while(grid.children.length>MAX_CARDS) grid.removeChild(grid.lastChild);
 }
-async function analyze(address){
+
+/* ===== analyze ===== */
+async function analyze(addr){
+  const maker = await probeEndpoint(addr);
+  if(!maker){ return; }
+  const url = maker(addr);
   try{
-    apiStatus.textContent = 'querying…';
-    const data = await fetchAddressInfo(address);
-    apiStatus.textContent = 'ok '+ts();
+    const r = await fetch(url, {headers:{accept:'application/json'}});
+    if(!r.ok){ apiStatus.innerHTML = `<span class="error">API ${r.status}</span>`; return; }
+    const data = await r.json();
 
-    // a estrutura do seu explorer (exemplo do screenshot)
-    // { exchange_rate, total_supply, items:[{ coin_balance, exchange_rate, token:{...}, ...}] }
+    // estrutura: { exchange_rate, total_supply, items:[ { coin_balance, exchange_rate, token:{...}, ... } ] }
     const item = (data.items && data.items[0]) ? data.items[0] : {};
-    // saldo e taxa
-    const coinBal = toFloat(item.coin_balance);
-    const rate = pickRate(item) || Number(data.exchange_rate) || DEFAULT_USD_RATE;
-    const usd = coinBal * rate;
-
+    const bal = toFloat(item.coin_balance);
+    const rate = pickRate(item, data);
+    const usd = bal * rate;
     const token = item.token || {};
+
     addCard({
-      address,
+      address: addr,
       usd,
-      balance: coinBal,
+      balance: bal,
       icon: token.icon_url,
       tokenSymbol: token.symbol || 'WPLS',
       holders: token.holders_count,
       reputation: item.reputation || token.reputation
     });
   }catch(e){
-    apiStatus.innerHTML = `<span class="error">error ${e.message||e}</span>`;
+    apiStatus.innerHTML = `<span class="error">${e.message||e}</span>`;
   }
 }
 
-/* ========================= EVENTS ======================== */
+/* ===== events ===== */
 analyzeBtn.onclick = ()=>{
   const a = addrInput.value.trim();
   if(!/^0x[a-fA-F0-9]{40}$/.test(a)){ alert('Paste a valid 0x address'); return; }
   analyze(a);
 };
-addrInput.addEventListener('keydown', (ev)=>{
-  if(ev.key==='Enter') analyzeBtn.click();
-});
+addrInput.addEventListener('keydown',(ev)=>{ if(ev.key==='Enter') analyzeBtn.click(); });
 tweetSite.onclick = ()=>{
-  const text = "I’m watching wallets go full exhibitionist at PORN – Orion Peep Show. Come expose yours. #PulseChain #WPLS";
+  const text = "Watching wallets go full exhibitionist at PORN – Orion Peep Show. Expose yours. #PulseChain #WPLS";
   window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(text)+"&url="+encodeURIComponent(location.href),'_blank');
 };
 buyBtn.onclick = ()=> window.open(PULSEX_BUY_URL, "_blank");
 
-/* ========================= BOOT ========================== */
-(function boot(){
-  // status ping simples
-  fetch(API_BASE,{method:'HEAD'}).then(
-    ()=> apiStatus.textContent='ready',
-    ()=> apiStatus.innerHTML='<span class="error">unreachable</span>'
-  );
-  // deep-link ?addr=0x...
+/* ===== boot ===== */
+(async function boot(){
+  // só para mostrar base
+  apiStatus.textContent = `probing ${API_BASE}`;
   const qp = new URLSearchParams(location.search);
   const addr = qp.get('addr');
   if(addr && /^0x[a-fA-F0-9]{40}$/.test(addr)) analyze(addr);
