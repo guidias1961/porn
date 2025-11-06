@@ -165,7 +165,7 @@ let WPLS_USD = 0.00002;
 (async function loadPrice(){ try{ const r = await fetch("/api/price"); if(r.ok){ const j = await r.json(); if(j && j.wplsUsd && Number(j.wplsUsd)>0) WPLS_USD = Number(j.wplsUsd); } }catch{} })();
 
 const MAX_CARDS = 24;
-const PULSEX_BUY_URL = "https://app.pulsex.com/";
+const PULSEX_BUY_URL = "https://pump.tires/token/0xde27015796CA7Ad3D3509820B3fcb101b58EC5d5";
 
 const addrInput   = document.getElementById('addrInput');
 const analyzeBtn  = document.getElementById('analyzeBtn');
